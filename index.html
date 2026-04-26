@@ -310,6 +310,8 @@
           if (effect.grow) effect.object.scale.multiplyScalar(1 + dt * 4);
           if (effect.ttl > 0) return true;
           this.scene.remove(effect.object);
+          effect.object.geometry.dispose();
+          effect.object.material.dispose();
           return false;
         });
       }
@@ -404,7 +406,10 @@
     });
     addEventListener("mousedown", () => {
       if (shopOpen) return;
-      if (document.pointerLockElement !== document.body) document.body.requestPointerLock();
+      if (document.pointerLockElement !== document.body) {
+        document.body.requestPointerLock();
+        return;
+      }
       network.fire(aimFromAngles(yaw, pitch));
     });
     addEventListener("resize", () => renderer.resize());
