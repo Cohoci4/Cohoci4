@@ -304,9 +304,13 @@ function allDead() {
 }
 
 // ─── Input ───
+function restartGame() {
+  init();
+  started = true;
+}
+
 function jumpPlayer(p) {
   if (!p || !p.alive) return;
-  if (gameOver) { init(); return; }
   if (!started) started = true;
   if (p.grounded) {
     p.vy = JUMP_FORCE;
@@ -314,16 +318,20 @@ function jumpPlayer(p) {
   }
 }
 
+function handleInput(playerNum) {
+  if (gameOver) { restartGame(); return; }
+  if (playerNum === 1) jumpPlayer(player1);
+  else if (playerNum === 2) jumpPlayer(player2);
+}
+
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space') { e.preventDefault(); jumpPlayer(player1); }
-  if (e.code === 'KeyW') { e.preventDefault(); jumpPlayer(player2); }
+  if (e.code === 'Space') { e.preventDefault(); handleInput(1); }
+  if (e.code === 'KeyW') { e.preventDefault(); handleInput(2); }
 });
-canvas.addEventListener('click', () => {
-  if (!twoPlayerMode) jumpPlayer(player1);
-});
+canvas.addEventListener('click', () => handleInput(1));
 canvas.addEventListener('touchstart', e => {
   e.preventDefault();
-  if (!twoPlayerMode) jumpPlayer(player1);
+  handleInput(1);
 }, { passive: false });
 
 // ─── Spawn helpers ───
