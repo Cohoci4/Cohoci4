@@ -175,6 +175,8 @@ function applyDamage(target, damage, attacker, now) {
 function purchaseItem(player, itemId) {
   const item = SHOP.find((shopItem) => shopItem.id === itemId);
   if (!item) return { ok: false, message: "Unknown item" };
+  if (item.type === "weapon" && player.weaponId === item.targetId) return { ok: true, message: `${item.name} already equipped` };
+  if (item.type === "skin" && player.skinId === item.targetId) return { ok: true, message: `${item.name} already equipped` };
   if (player.credits < item.price) return { ok: false, message: "Not enough credits" };
   player.credits -= item.price;
   if (item.type === "weapon") player.weaponId = item.targetId;

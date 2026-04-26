@@ -261,13 +261,28 @@
         return group;
       }
 
+      disposeGroup(group) {
+        group.traverse((child) => {
+          if (child.geometry) child.geometry.dispose();
+          if (!child.material) return;
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          for (const material of materials) {
+            if (material.map) material.map.dispose();
+            material.dispose();
+          }
+        });
+      }
+
       sync() {
         const visibleIds = new Set();
         for (const player of this.repository.players.values()) {
           visibleIds.add(player.id);
           let mesh = this.meshes.get(player.id);
           if (!mesh || mesh.userData.skinId !== player.skinId) {
-            if (mesh) this.scene.remove(mesh);
+            if (mesh) {
+              this.scene.remove(mesh);
+              this.disposeGroup(mesh);
+            }
             mesh = this.makeRanger(player);
             this.meshes.set(player.id, mesh);
             this.scene.add(mesh);
@@ -282,6 +297,7 @@
         for (const [id, mesh] of this.meshes) {
           if (!visibleIds.has(id)) {
             this.scene.remove(mesh);
+            this.disposeGroup(mesh);
             this.meshes.delete(id);
           }
         }
@@ -393,7 +409,7 @@
 
     addEventListener("keydown", (event) => {
       keys[event.code] = true;
-      if (event.code === "KeyB") {
+      if (event.code === "KeyB" && !event.repeat) {
         shopOpen = !shopOpen;
         $("shop").classList.toggle("open", shopOpen);
       }
