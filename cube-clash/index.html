@@ -212,6 +212,21 @@
       transition: opacity 0.25s;
     }
     #pointer-lock-hint.hidden { opacity: 0; }
+
+    #damage-vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.18s ease-out;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 40%,
+        rgba(255, 60, 70, 0.55) 100%
+      );
+      mix-blend-mode: screen;
+      z-index: 5;
+    }
   </style>
 
   <script type="importmap">
@@ -263,7 +278,8 @@
 
   <div class="crosshair"></div>
 
-  <div id="pointer-lock-hint">Click to lock cursor and play</div>
+  <div id="pointer-lock-hint">Click to start</div>
+  <div id="damage-vignette"></div>
 
   <div id="match-over" class="overlay hidden">
     <div class="panel">

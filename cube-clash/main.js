@@ -41,6 +41,10 @@
     let match = null;
     let arena = null;
     let matchOverShown = false;
+    // The match clock and AI stay frozen until the player has locked the
+    // pointer at least once — otherwise bots would shred the player while
+    // they're still reading the "Click to start" prompt.
+    let started = false;
 
     function newMatch() {
       const r = startMatchUseCase.execute();
@@ -48,6 +52,7 @@
       arena = r.arena;
       updateMatchUseCase.arena = arena;
       matchOverShown = false;
+      started = false;
       renderer.init(match);
       renderer.syncEntities(match);
       ui.hideMatchOver();
@@ -63,12 +68,18 @@
       const dt = Math.min(MAX_DT, (now - lastTime) / 1000);
       lastTime = now;
 
+      if (!started && input.isLocked()) started = true;
+
       if (match) {
-        if (!match.over) {
+        if (started && !match.over) {
           const snap = input.sample(dt);
           handleInputUseCase.execute({ match, input: snap, dt });
           botAIUseCase.execute({ match, dt });
           updateMatchUseCase.execute({ match, dt });
+        } else {
+          // Drain queued input/mouse-deltas so they don't accumulate
+          // before the match starts ticking.
+          input.sample(dt);
         }
         renderer.syncEntities(match);
         renderer.render(match, dt);

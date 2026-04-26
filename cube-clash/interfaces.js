@@ -31,6 +31,13 @@
      * }
      */
     sample(_dt) { throw new Error('IInputProvider.sample not implemented'); }
+    /**
+     * Returns true when the input source is "active" — for the keyboard +
+     * mouse adapter, this means pointer-lock is engaged. Used by the
+     * composition root to decide when to start ticking the match.
+     * Defaults to true so simpler providers don't need to override.
+     */
+    isLocked() { return true; }
     dispose() {}
   }
 

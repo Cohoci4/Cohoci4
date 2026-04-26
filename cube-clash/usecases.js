@@ -68,7 +68,9 @@
       const id = match.nextBotId();
       const pos = this.arena.randomEdgePosition();
       const bot = new Bot({ id, position: pos, color: E.randomBrightColor() });
-      bot.yaw = Math.atan2(-pos.x, -pos.z);
+      // Forward in entity-local space is (-sin(yaw), 0, -cos(yaw)). To face
+      // the arena center from `pos`, that forward must equal -pos / |pos|.
+      bot.yaw = Math.atan2(pos.x, pos.z);
       match.bots.set(id, bot);
       return bot;
     }
@@ -119,7 +121,9 @@
 
         const toPlayer = vec(player.position.x - bot.position.x, 0, player.position.z - bot.position.z);
         const distToPlayer = Math.hypot(toPlayer.x, toPlayer.z) || 0.0001;
-        bot.yaw = Math.atan2(toPlayer.x, toPlayer.z);
+        // Forward in entity-local space is (-sin(yaw), 0, -cos(yaw)); set yaw
+        // so that forward points from bot toward player.
+        bot.yaw = Math.atan2(-toPlayer.x, -toPlayer.z);
 
         let forwardInput = 0;
         if (distToPlayer > 15) forwardInput = 1;
@@ -360,7 +364,8 @@
         p.fireCooldown = 0;
         p.hitFlash = 0;
         p.onGround = true;
-        p.cameraYaw = Math.atan2(-pos.x, -pos.z);
+        // Face the arena center on respawn (see _spawnBot for derivation).
+        p.cameraYaw = Math.atan2(pos.x, pos.z);
         p.yaw = p.cameraYaw;
         match.pendingPlayerRespawn = null;
       }

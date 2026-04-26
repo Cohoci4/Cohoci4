@@ -476,6 +476,8 @@
       this.finalHitsEl = document.getElementById('final-hits');
       this.finalDeathsEl = document.getElementById('final-deaths');
       this.playAgainBtn = document.getElementById('play-again');
+      this.vignetteEl = document.getElementById('damage-vignette');
+      this._lastHp = null;
     }
 
     update(match) {
@@ -489,6 +491,13 @@
       this.hpEl.textContent = String(Math.max(0, Math.round(p.hp)));
       const pct = Math.max(0, Math.min(1, p.hp / p.maxHp));
       this.hpBar.style.width = `${pct * 100}%`;
+
+      // Damage vignette: spike to ~1 when hp drops, otherwise fade with hitFlash.
+      const hpDropped = this._lastHp !== null && p.hp < this._lastHp && p.alive;
+      const flash = p.hitFlash || 0;
+      const target = hpDropped ? 1 : Math.min(1, flash * 4);
+      if (this.vignetteEl) this.vignetteEl.style.opacity = String(target);
+      this._lastHp = p.hp;
 
       const bots = [...match.bots.values()];
       bots.sort((a, b) => b.score - a.score);
