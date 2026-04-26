@@ -249,6 +249,10 @@
       this.edges.material.dispose();
       this.wedge.geometry.dispose();
       this.wedge.material.dispose();
+      this.hpBar.bg.geometry.dispose();
+      this.hpBar.bg.material.dispose();
+      this.hpBar.fg.geometry.dispose();
+      this.hpBar.fg.material.dispose();
     }
   }
 
@@ -358,7 +362,21 @@
       window.addEventListener('resize', () => this.resize(window.innerWidth, window.innerHeight));
     }
 
-    init(_match) {}
+    init(_match) {
+      // Drop any views retained from a previous match so that "Play Again"
+      // doesn't reuse stale meshes (bot IDs restart at 1 on each new Match
+      // and would otherwise inherit the previous bot's color/material).
+      for (const view of this.combatantViews.values()) {
+        this.scene.remove(view.group);
+        view.dispose();
+      }
+      this.combatantViews.clear();
+      for (const view of this.projectileViews.values()) {
+        this.scene.remove(view.group);
+        view.dispose();
+      }
+      this.projectileViews.clear();
+    }
 
     resize(w, h) {
       this.renderer.setSize(w, h, false);
