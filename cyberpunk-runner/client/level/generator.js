@@ -402,8 +402,8 @@ export class LevelGenerator {
       maxX: x + hw,
       minY: yOffset || 0,
       maxY: (yOffset || 0) + hh,
-      minZ: z - 0.5,
-      maxZ: z + 0.5,
+      minZ: z - 1.5,
+      maxZ: z + 1.5,
     };
 
     return { type, def, lane, group, mesh, box, z, worldZ: z };
@@ -454,8 +454,8 @@ export class LevelGenerator {
       maxX: x + 0.4,
       minY: yOffset - 0.4,
       maxY: yOffset + 0.4,
-      minZ: z - 0.4,
-      maxZ: z + 0.4,
+      minZ: z - 0.8,
+      maxZ: z + 0.8,
     };
 
     return { type, mesh, box, z, value: type === 'credit' ? 10 : 0 };
@@ -495,8 +495,8 @@ export class LevelGenerator {
       if (obs.group) {
         obs.group.position.z = relZ;
       }
-      obs.box.minZ = relZ - 0.5;
-      obs.box.maxZ = relZ + 0.5;
+      obs.box.minZ = relZ - 1.5;
+      obs.box.maxZ = relZ + 1.5;
 
       // Animations
       if (obs.mesh) {
@@ -516,8 +516,8 @@ export class LevelGenerator {
         col.mesh.rotation.y += 0.03;
         col.mesh.position.y += Math.sin(performance.now() * 0.003 + (col.mesh.userData.bobOffset || 0)) * 0.002;
       }
-      col.box.minZ = relZ - 0.4;
-      col.box.maxZ = relZ + 0.4;
+      col.box.minZ = relZ - 0.8;
+      col.box.maxZ = relZ + 0.8;
     }
 
     // Update segment positions
