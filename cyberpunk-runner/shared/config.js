@@ -7,7 +7,7 @@ export const OBSTACLE_DEFS = {
     width: 3.0,
     action: 'jump',
     color: 0xff0044,
-    minDistance: 800,
+    minDistance: 100,
   },
   [OBSTACLE_TYPES.LASER_HIGH]: {
     height: 1.6,
@@ -15,7 +15,7 @@ export const OBSTACLE_DEFS = {
     width: 3.0,
     action: 'slide',
     color: 0xff0044,
-    minDistance: 400,
+    minDistance: 80,
   },
   [OBSTACLE_TYPES.BLADE]: {
     height: 2.0,
@@ -23,7 +23,7 @@ export const OBSTACLE_DEFS = {
     action: 'jump_or_slide',
     color: 0xff4400,
     rotates: true,
-    minDistance: 600,
+    minDistance: 120,
   },
   [OBSTACLE_TYPES.DRONE]: {
     height: 1.0,
@@ -31,14 +31,14 @@ export const OBSTACLE_DEFS = {
     action: 'lane_change',
     color: 0xaa00ff,
     flies: true,
-    minDistance: 500,
+    minDistance: 60,
   },
   [OBSTACLE_TYPES.PANEL]: {
     height: 2.5,
     width: 2.8,
     action: 'lane_change',
     color: 0x666688,
-    minDistance: 300,
+    minDistance: 0,
   },
   [OBSTACLE_TYPES.PLATFORM_COLLAPSE]: {
     height: 0,
@@ -46,7 +46,7 @@ export const OBSTACLE_DEFS = {
     action: 'jump',
     color: 0x884400,
     collapses: true,
-    minDistance: 1200,
+    minDistance: 200,
   },
   [OBSTACLE_TYPES.VIRUS_DRONE]: {
     height: 1.0,
@@ -55,7 +55,7 @@ export const OBSTACLE_DEFS = {
     color: 0x00ff44,
     disables: true,
     disableDuration: 2000,
-    minDistance: 2000,
+    minDistance: 300,
   },
 };
 
