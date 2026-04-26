@@ -15,6 +15,7 @@ export class HUD {
       document.body.appendChild(this.container);
     }
 
+    this.container.style.display = 'block';
     this.container.innerHTML = `
       <div class="hud-top">
         <div class="hud-distance">
