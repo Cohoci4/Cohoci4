@@ -18,6 +18,11 @@
     syncEntities(_match) { throw new Error('IRenderer.syncEntities not implemented'); }
     /** Resize backing buffer when viewport changes. */
     resize(_w, _h) { throw new Error('IRenderer.resize not implemented'); }
+    /**
+     * Consume domain events emitted during the last tick. Default no-op so
+     * existing renderers don't have to opt in.
+     */
+    handleEvents(_events, _match) {}
   }
 
   class IInputProvider {
@@ -38,6 +43,11 @@
      * Defaults to true so simpler providers don't need to override.
      */
     isLocked() { return true; }
+    /**
+     * Optional hook for input adapters that need a user gesture (e.g. for
+     * unlocking Web Audio). Default no-op.
+     */
+    onUserGesture(_cb) {}
     dispose() {}
   }
 
@@ -46,6 +56,22 @@
     showMatchOver(_match) { throw new Error('IUiPresenter.showMatchOver not implemented'); }
     hideMatchOver() { throw new Error('IUiPresenter.hideMatchOver not implemented'); }
     onPlayAgain(_cb) { throw new Error('IUiPresenter.onPlayAgain not implemented'); }
+    /** Consume domain events for HUD reactions (kill feed, hit marker, etc). */
+    handleEvents(_events, _match) {}
+  }
+
+  /**
+   * IAudioPresenter — audio output abstraction. Mirrors the renderer's
+   * event-driven contract so the use case layer can stay agnostic of
+   * Web Audio (or whatever audio API a different platform might use).
+   */
+  class IAudioPresenter {
+    /** Called once after a user gesture so audio context can be unlocked. */
+    unlock() {}
+    /** Consume domain events to play sounds. */
+    handleEvents(_events, _match) {}
+    /** Tick periodic audio (ambient drone volume, etc). */
+    update(_match, _dt) {}
   }
 
   class IMatchRepository {
@@ -55,6 +81,6 @@
   }
 
   CubeClash.interfaces = {
-    IRenderer, IInputProvider, IUiPresenter, IMatchRepository,
+    IRenderer, IInputProvider, IUiPresenter, IMatchRepository, IAudioPresenter,
   };
 })(window.CubeClash = window.CubeClash || {});

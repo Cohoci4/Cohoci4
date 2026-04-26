@@ -227,6 +227,130 @@
       mix-blend-mode: screen;
       z-index: 5;
     }
+
+    /* Dash readiness bar lives just below the HP bar. */
+    #dash-bar-outer {
+      width: 100%; height: 5px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 6px;
+      position: relative;
+    }
+    #dash-bar-inner {
+      height: 100%;
+      background: linear-gradient(90deg, #6dcfff, #b46bff);
+      width: 0%;
+      transition: width 0.05s linear;
+    }
+    #dash-bar.ready #dash-bar-inner {
+      box-shadow: 0 0 8px rgba(180,107,255,0.85);
+    }
+    #dash-label {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+      margin-top: 4px;
+      text-align: right;
+    }
+    #dash-label.ready { color: #b46bff; }
+
+    /* Hit marker overlaying the crosshair when the player lands a shot. */
+    #hit-marker {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 28px; height: 28px;
+      margin-left: -14px; margin-top: -14px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s ease-out;
+      z-index: 6;
+      mix-blend-mode: screen;
+    }
+    #hit-marker.visible { opacity: 1; }
+    #hit-marker::before, #hit-marker::after {
+      content: '';
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 18px; height: 2px;
+      background: #ffffff;
+      box-shadow: 0 0 6px rgba(255,255,255,0.7);
+      transform-origin: 0 0;
+    }
+    #hit-marker::before { transform: translate(-50%, -50%) rotate(45deg); }
+    #hit-marker::after  { transform: translate(-50%, -50%) rotate(-45deg); }
+
+    /* Kill feed pinned to the right edge below the timer. */
+    #kill-feed {
+      position: absolute;
+      top: 70px; right: 16px;
+      list-style: none;
+      margin: 0; padding: 0;
+      max-width: 280px;
+      pointer-events: none;
+      z-index: 4;
+    }
+    #kill-feed li {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 5px 10px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      animation: killfeedslide 0.22s ease-out;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    #kill-feed li .sep { color: var(--accent); }
+    #kill-feed li.kill-feed-self-kill { border-color: rgba(102,255,153,0.5); }
+    #kill-feed li.kill-feed-self-kill .k { color: var(--good); font-weight: 700; }
+    #kill-feed li.kill-feed-self-death { border-color: rgba(255,85,102,0.5); }
+    #kill-feed li.kill-feed-self-death .v { color: var(--bad); font-weight: 700; }
+    #kill-feed li.kill-feed-pickup {
+      border-color: rgba(102,255,153,0.5);
+      color: var(--good);
+      justify-content: flex-end;
+    }
+    @keyframes killfeedslide {
+      from { transform: translateX(20px); opacity: 0; }
+      to   { transform: translateX(0); opacity: 1; }
+    }
+
+    /* Big centered countdown overlay during the pre-match grace. */
+    #countdown {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 140px;
+      font-weight: 800;
+      color: var(--accent);
+      text-shadow:
+        0 0 30px rgba(255,216,77,0.7),
+        0 8px 0 rgba(0,0,0,0.35);
+      pointer-events: none;
+      z-index: 6;
+      animation: countdownpop 0.6s ease-out;
+    }
+    #countdown.go {
+      color: var(--good);
+      text-shadow:
+        0 0 40px rgba(102,255,153,0.8),
+        0 8px 0 rgba(0,0,0,0.35);
+      font-size: 110px;
+      letter-spacing: 4px;
+    }
+    #countdown.hidden { display: none; }
+    @keyframes countdownpop {
+      0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+      40%  { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
   </style>
 
   <script type="importmap">
@@ -268,15 +392,24 @@
     <div class="row"><span class="label">Score</span><span class="value" id="score-value">0</span></div>
     <div class="row"><span class="label">Health</span><span class="value" id="hp-value">100</span></div>
     <div id="hp-bar-outer"><div id="hp-bar-inner"></div></div>
+    <div id="dash-bar">
+      <div id="dash-bar-outer"><div id="dash-bar-inner"></div></div>
+      <div id="dash-label">Dash</div>
+    </div>
   </div>
 
   <div id="controls-hint" class="hud">
-    <kbd>WASD</kbd> move &nbsp; <kbd>Space</kbd> jump<br/>
+    <kbd>WASD</kbd> move &nbsp; <kbd>Space</kbd> jump &nbsp; <kbd>Shift</kbd> dash<br/>
     <kbd>Mouse</kbd> aim &nbsp; <kbd>LMB</kbd> shoot<br/>
     <kbd>Esc</kbd> release mouse
   </div>
 
   <div class="crosshair"></div>
+  <div id="hit-marker"></div>
+
+  <ul id="kill-feed"></ul>
+
+  <div id="countdown" class="hidden">3</div>
 
   <div id="pointer-lock-hint">Click to start</div>
   <div id="damage-vignette"></div>

@@ -12,8 +12,13 @@
   const I = CubeClash.interfaces;
   if (!E || !I) throw new Error('adapters.js requires entities.js and interfaces.js to be loaded first');
 
-  const { ARENA_RADIUS, PROJECTILE_RADIUS } = E.constants;
-  const { IRenderer, IInputProvider, IUiPresenter, IMatchRepository } = I;
+  const {
+    ARENA_RADIUS, PROJECTILE_RADIUS,
+    DASH_COOLDOWN,
+  } = E.constants;
+  const {
+    IRenderer, IInputProvider, IUiPresenter, IMatchRepository, IAudioPresenter,
+  } = I;
 
   // =============================================================================
   // InMemoryMatchRepository
@@ -42,10 +47,18 @@
       this.sensitivity = 0.0025;
       this._isLocked = false;
 
+      this.dashQueued = false;
+      this._gestureCallbacks = [];
+      this._gestureFired = false;
+
       this._onKeyDown = (e) => {
         this.keys.add(e.code);
         if (e.code === 'Space') {
           this.jumpQueued = true;
+          e.preventDefault();
+        }
+        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+          if (!e.repeat) this.dashQueued = true;
           e.preventDefault();
         }
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
@@ -55,6 +68,7 @@
       this._onKeyUp = (e) => { this.keys.delete(e.code); };
       this._onMouseDown = (e) => {
         if (e.button === 0) {
+          this._fireGesture();
           if (!this._isLocked) {
             this.canvas.requestPointerLock?.();
           } else {
@@ -85,6 +99,15 @@
 
     isLocked() { return this._isLocked; }
 
+    onUserGesture(cb) { this._gestureCallbacks.push(cb); }
+    _fireGesture() {
+      if (this._gestureFired) return;
+      this._gestureFired = true;
+      for (const cb of this._gestureCallbacks) {
+        try { cb(); } catch (_e) { /* ignore */ }
+      }
+    }
+
     sample(_dt) {
       let mx = 0, mz = 0;
       if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) mz += 1;
@@ -100,11 +123,15 @@
       const jump = this.jumpQueued;
       this.jumpQueued = false;
 
+      const dash = this.dashQueued;
+      this.dashQueued = false;
+
       return {
         move: { x: mx, z: mz },
         look: { yawDelta: lookYaw, pitchDelta: lookPitch },
         fire: this.fire && this._isLocked,
         jump,
+        dash: dash && this._isLocked,
       };
     }
 
@@ -241,6 +268,18 @@
       const flash = combatant.hitFlash || 0;
       this.mesh.material.emissive.setHex(0xffffff);
       this.mesh.material.emissiveIntensity = Math.min(1, flash * 4);
+
+      // Post-respawn invulnerability blink: alternate opacity.
+      if (combatant.invulnTimer > 0) {
+        const blink = (Math.floor(combatant.invulnTimer * 12) % 2) === 0 ? 0.45 : 1;
+        this.mesh.material.transparent = true;
+        this.mesh.material.opacity = blink;
+        this.edges.material.opacity = 0.2 * blink + 0.15;
+      } else {
+        this.mesh.material.transparent = false;
+        this.mesh.material.opacity = 1;
+        this.edges.material.opacity = 0.35;
+      }
     }
     dispose() {
       this.mesh.geometry.dispose();
@@ -254,6 +293,77 @@
       this.hpBar.fg.geometry.dispose();
       this.hpBar.fg.material.dispose();
     }
+  }
+
+  // =============================================================================
+  // PickupView — floating, glowing green plus sign
+  // =============================================================================
+
+  class PickupView {
+    constructor(THREE, pickup) {
+      this.id = pickup.id;
+      this.group = new THREE.Group();
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x66ff99, emissive: 0x33dd66, emissiveIntensity: 0.7,
+        roughness: 0.3, metalness: 0.1,
+      });
+      const armX = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.22, 0.22), mat);
+      const armY = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.9, 0.22), mat);
+      const armZ = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.9), mat);
+      this.group.add(armX);
+      this.group.add(armY);
+      this.group.add(armZ);
+      this._arms = [armX, armY, armZ];
+      this._sharedMat = mat;
+
+      // Glow halo: a slightly larger transparent box for emissive bloom feel.
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: 0x66ff99, transparent: true, opacity: 0.18,
+      });
+      const halo = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 12), haloMat);
+      this.halo = halo;
+      this.group.add(halo);
+
+      this._t = 0;
+    }
+    update(pickup, dt) {
+      this._t += dt;
+      this.group.position.set(
+        pickup.position.x,
+        pickup.position.y + Math.sin(this._t * 2.5) * 0.15,
+        pickup.position.z,
+      );
+      this.group.rotation.y = this._t * 1.2;
+    }
+    dispose() {
+      for (const arm of this._arms) arm.geometry.dispose();
+      this._sharedMat.dispose();
+      this.halo.geometry.dispose();
+      this.halo.material.dispose();
+    }
+  }
+
+  // =============================================================================
+  // Procedural fx: muzzle flash, damage number, screen shake
+  // =============================================================================
+
+  function makeDamageNumberTexture(THREE, text, color) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = 'bold 44px system-ui, -apple-system, Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = '#000000';
+    ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+    ctx.fillStyle = color;
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
   }
 
   class ProjectileView {
@@ -318,6 +428,12 @@
       this.camera = new THREE.PerspectiveCamera(70, 1, 0.1, 200);
       this.camera.position.set(0, 6, 10);
 
+      // Transient FX state.
+      this._muzzleFlashes = [];      // {mesh, t, life}
+      this._damageNumbers = [];      // {sprite, t, life, vy}
+      this._shakeMag = 0;            // current shake magnitude (decays)
+      this._shakeOffset = { x: 0, y: 0, z: 0 };
+
       const hemi = new THREE.HemisphereLight(0xffffff, 0x223355, 0.8);
       this.scene.add(hemi);
       const dir = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -357,6 +473,7 @@
 
       this.combatantViews = new Map();
       this.projectileViews = new Map();
+      this.pickupViews = new Map();
 
       this.resize(window.innerWidth, window.innerHeight);
       window.addEventListener('resize', () => this.resize(window.innerWidth, window.innerHeight));
@@ -376,6 +493,26 @@
         view.dispose();
       }
       this.projectileViews.clear();
+      for (const view of this.pickupViews.values()) {
+        this.scene.remove(view.group);
+        view.dispose();
+      }
+      this.pickupViews.clear();
+      // Clear transient fx.
+      for (const m of this._muzzleFlashes) {
+        this.scene.remove(m.mesh);
+        m.mesh.geometry.dispose();
+        m.mesh.material.dispose();
+      }
+      this._muzzleFlashes.length = 0;
+      for (const d of this._damageNumbers) {
+        this.scene.remove(d.sprite);
+        d.sprite.material.map?.dispose();
+        d.sprite.material.dispose();
+      }
+      this._damageNumbers.length = 0;
+      this._shakeMag = 0;
+      this._shakeOffset.x = this._shakeOffset.y = this._shakeOffset.z = 0;
     }
 
     resize(w, h) {
@@ -424,9 +561,138 @@
           this.projectileViews.delete(id);
         }
       }
+
+      const pickupPresent = new Set();
+      for (const pickup of match.pickups.values()) {
+        if (!pickup.alive) continue;
+        pickupPresent.add(pickup.id);
+        if (!this.pickupViews.has(pickup.id)) {
+          const v = new PickupView(this.THREE, pickup);
+          this.pickupViews.set(pickup.id, v);
+          this.scene.add(v.group);
+        }
+      }
+      for (const [id, view] of this.pickupViews) {
+        if (!pickupPresent.has(id)) {
+          this.scene.remove(view.group);
+          view.dispose();
+          this.pickupViews.delete(id);
+        }
+      }
     }
 
-    render(match, _dt) {
+    handleEvents(events, match) {
+      const THREE = this.THREE;
+      for (const ev of events) {
+        if (ev.type === 'fire') {
+          this._spawnMuzzleFlash(ev.position, ev.direction, ev.ownerTeam);
+        } else if (ev.type === 'hit') {
+          // Floating damage number above the victim.
+          const color = ev.shooterIsPlayer ? '#ffd84d' : '#ff7b8b';
+          this._spawnDamageNumber(
+            ev.position,
+            ev.killed ? `${ev.damage}!` : String(ev.damage),
+            color,
+          );
+          // Shake the camera when the player takes damage.
+          if (ev.victimIsPlayer) {
+            this._shakeMag = Math.max(this._shakeMag, 0.45);
+          }
+        }
+      }
+      void THREE; // satisfy lint without unused-var noise
+      void match;
+    }
+
+    _spawnMuzzleFlash(position, direction, ownerTeam) {
+      const THREE = this.THREE;
+      const color = (ownerTeam === E.constants.TEAM_PLAYER) ? 0xffe085 : 0xff8866;
+      const geo = new THREE.SphereGeometry(0.35, 12, 8);
+      const mat = new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity: 0.9, depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(position.x, position.y, position.z);
+      this.scene.add(mesh);
+      this._muzzleFlashes.push({ mesh, t: 0, life: 0.09 });
+      // Cap simultaneous flashes; oldest gets removed early.
+      if (this._muzzleFlashes.length > 24) {
+        const oldest = this._muzzleFlashes.shift();
+        this.scene.remove(oldest.mesh);
+        oldest.mesh.geometry.dispose();
+        oldest.mesh.material.dispose();
+      }
+      void direction;
+    }
+
+    _spawnDamageNumber(position, text, color) {
+      const THREE = this.THREE;
+      const tex = makeDamageNumberTexture(THREE, text, color);
+      const mat = new THREE.SpriteMaterial({
+        map: tex, transparent: true, depthTest: false,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(1.4, 0.7, 1);
+      sprite.position.set(
+        position.x + (Math.random() - 0.5) * 0.4,
+        position.y,
+        position.z + (Math.random() - 0.5) * 0.4,
+      );
+      this.scene.add(sprite);
+      this._damageNumbers.push({ sprite, t: 0, life: 0.85, vy: 1.6 });
+      if (this._damageNumbers.length > 32) {
+        const oldest = this._damageNumbers.shift();
+        this.scene.remove(oldest.sprite);
+        oldest.sprite.material.map?.dispose();
+        oldest.sprite.material.dispose();
+      }
+    }
+
+    _tickFx(dt) {
+      // Muzzle flashes fade out and shrink.
+      for (let i = this._muzzleFlashes.length - 1; i >= 0; i--) {
+        const m = this._muzzleFlashes[i];
+        m.t += dt;
+        const k = m.t / m.life;
+        if (k >= 1) {
+          this.scene.remove(m.mesh);
+          m.mesh.geometry.dispose();
+          m.mesh.material.dispose();
+          this._muzzleFlashes.splice(i, 1);
+        } else {
+          m.mesh.material.opacity = (1 - k) * 0.9;
+          const s = 1 + k * 1.4;
+          m.mesh.scale.setScalar(s);
+        }
+      }
+      // Damage numbers float up and fade.
+      for (let i = this._damageNumbers.length - 1; i >= 0; i--) {
+        const d = this._damageNumbers[i];
+        d.t += dt;
+        const k = d.t / d.life;
+        if (k >= 1) {
+          this.scene.remove(d.sprite);
+          d.sprite.material.map?.dispose();
+          d.sprite.material.dispose();
+          this._damageNumbers.splice(i, 1);
+        } else {
+          d.sprite.position.y += d.vy * dt;
+          d.sprite.material.opacity = 1 - k;
+        }
+      }
+      // Screen shake decays exponentially toward zero.
+      this._shakeMag *= Math.exp(-dt / 0.12);
+      if (this._shakeMag < 0.005) {
+        this._shakeMag = 0;
+        this._shakeOffset.x = this._shakeOffset.y = this._shakeOffset.z = 0;
+      } else {
+        this._shakeOffset.x = (Math.random() - 0.5) * this._shakeMag;
+        this._shakeOffset.y = (Math.random() - 0.5) * this._shakeMag * 0.6;
+        this._shakeOffset.z = (Math.random() - 0.5) * this._shakeMag;
+      }
+    }
+
+    render(match, dt) {
       for (const [id, view] of this.combatantViews) {
         const entity = (id === match.player.id) ? match.player : match.bots.get(id);
         if (!entity) continue;
@@ -436,15 +702,21 @@
         const proj = match.projectiles.get(id);
         if (proj) view.update(proj);
       }
+      for (const [id, view] of this.pickupViews) {
+        const pickup = match.pickups.get(id);
+        if (pickup) view.update(pickup, dt);
+      }
+
+      this._tickFx(dt);
 
       const p = match.player;
       const cy = Math.cos(p.cameraYaw), sy = Math.sin(p.cameraYaw);
       const cp = Math.cos(p.cameraPitch), sp = Math.sin(p.cameraPitch);
       const back = 5;
       const headY = p.position.y + 0.9;
-      const camX = p.position.x + (sy * cp) * back;
-      const camY = headY - sp * back + 0.6;
-      const camZ = p.position.z + (cy * cp) * back;
+      const camX = p.position.x + (sy * cp) * back + this._shakeOffset.x;
+      const camY = headY - sp * back + 0.6 + this._shakeOffset.y;
+      const camZ = p.position.z + (cy * cp) * back + this._shakeOffset.z;
       this.camera.position.set(camX, Math.max(0.6, camY), camZ);
       this.camera.lookAt(p.position.x - sy * cp, headY + sp * 1.5, p.position.z - cy * cp);
 
@@ -477,7 +749,16 @@
       this.finalDeathsEl = document.getElementById('final-deaths');
       this.playAgainBtn = document.getElementById('play-again');
       this.vignetteEl = document.getElementById('damage-vignette');
+      this.hitMarkerEl = document.getElementById('hit-marker');
+      this.killFeedEl = document.getElementById('kill-feed');
+      this.countdownEl = document.getElementById('countdown');
+      this.dashBarInner = document.getElementById('dash-bar-inner');
+      this.dashBar = document.getElementById('dash-bar');
       this._lastHp = null;
+      this._hitMarkerUntil = 0;
+      this._goShownUntil = 0;
+      this._killFeed = []; // [{html, expiresAt}]
+      this._now = () => performance.now() / 1000;
     }
 
     update(match) {
@@ -492,12 +773,51 @@
       const pct = Math.max(0, Math.min(1, p.hp / p.maxHp));
       this.hpBar.style.width = `${pct * 100}%`;
 
+      // Dash bar fills as cooldown drains.
+      if (this.dashBarInner) {
+        const dashReady = 1 - Math.max(0, Math.min(1, p.dashCooldown / DASH_COOLDOWN));
+        this.dashBarInner.style.width = `${dashReady * 100}%`;
+        if (this.dashBar) this.dashBar.classList.toggle('ready', dashReady >= 0.999);
+      }
+
       // Damage vignette: spike to ~1 when hp drops, otherwise fade with hitFlash.
       const hpDropped = this._lastHp !== null && p.hp < this._lastHp && p.alive;
       const flash = p.hitFlash || 0;
       const target = hpDropped ? 1 : Math.min(1, flash * 4);
       if (this.vignetteEl) this.vignetteEl.style.opacity = String(target);
       this._lastHp = p.hp;
+
+      // Countdown overlay.
+      if (this.countdownEl) {
+        const now = this._now();
+        if (match.isPreMatch()) {
+          const remaining = Math.ceil(match.preMatch);
+          this.countdownEl.textContent = String(remaining);
+          this.countdownEl.classList.remove('hidden');
+          this.countdownEl.classList.remove('go');
+        } else if (now < this._goShownUntil) {
+          this.countdownEl.textContent = 'GO!';
+          this.countdownEl.classList.add('go');
+          this.countdownEl.classList.remove('hidden');
+        } else {
+          this.countdownEl.classList.add('hidden');
+        }
+      }
+
+      // Hit marker fade-out.
+      if (this.hitMarkerEl) {
+        const now = this._now();
+        const visible = now < this._hitMarkerUntil;
+        this.hitMarkerEl.classList.toggle('visible', visible);
+      }
+
+      // Kill feed expiration.
+      if (this.killFeedEl) {
+        const now = this._now();
+        const before = this._killFeed.length;
+        this._killFeed = this._killFeed.filter(e => e.expiresAt > now);
+        if (this._killFeed.length !== before) this._renderKillFeed();
+      }
 
       const bots = [...match.bots.values()];
       bots.sort((a, b) => b.score - a.score);
@@ -528,12 +848,239 @@
       this.matchOverPanel.classList.remove('hidden');
       if (document.pointerLockElement) document.exitPointerLock?.();
     }
-    hideMatchOver() { this.matchOverPanel.classList.add('hidden'); }
+    hideMatchOver() {
+      this.matchOverPanel.classList.add('hidden');
+      this._killFeed = [];
+      this._renderKillFeed();
+      this._hitMarkerUntil = 0;
+      this._goShownUntil = 0;
+    }
     onPlayAgain(cb) { this.playAgainBtn.addEventListener('click', () => cb()); }
+
+    handleEvents(events, _match) {
+      const now = this._now();
+      for (const ev of events) {
+        if (ev.type === 'hit' && ev.shooterIsPlayer) {
+          this._hitMarkerUntil = now + 0.18;
+        } else if (ev.type === 'kill') {
+          const killer = ev.killerIsPlayer ? 'You' : ev.killerName;
+          const victim = ev.victimIsPlayer ? 'You' : ev.victimName;
+          const klass = ev.killerIsPlayer
+            ? 'kill-feed-self-kill'
+            : (ev.victimIsPlayer ? 'kill-feed-self-death' : '');
+          const html = `<li class="${klass}">`
+            + `<span class="k">${escapeHtml(killer)}</span>`
+            + `<span class="sep">▸</span>`
+            + `<span class="v">${escapeHtml(victim)}</span>`
+            + `</li>`;
+          this._killFeed.unshift({ html, expiresAt: now + 4.5 });
+          if (this._killFeed.length > 5) this._killFeed.length = 5;
+          this._renderKillFeed();
+        } else if (ev.type === 'go') {
+          this._goShownUntil = now + 0.7;
+        } else if (ev.type === 'pickup' && ev.consumerIsPlayer) {
+          // Briefly show a positive marker via the kill feed for feedback.
+          const html = `<li class="kill-feed-pickup">`
+            + `<span class="k">+${ev.healed} HP</span>`
+            + `</li>`;
+          this._killFeed.unshift({ html, expiresAt: now + 2.5 });
+          if (this._killFeed.length > 5) this._killFeed.length = 5;
+          this._renderKillFeed();
+        }
+      }
+    }
+
+    _renderKillFeed() {
+      if (!this.killFeedEl) return;
+      this.killFeedEl.innerHTML = this._killFeed.map(e => e.html).join('');
+    }
+  }
+
+  // =============================================================================
+  // WebAudioAdapter — procedural SFX via Web Audio API (no asset files)
+  // =============================================================================
+
+  class WebAudioAdapter extends IAudioPresenter {
+    constructor() {
+      super();
+      this.ctx = null;
+      this.master = null;
+      this.muted = false;
+      this._lastFireAt = 0;
+      this._lastBotFireAt = 0;
+    }
+
+    unlock() {
+      if (this.ctx) {
+        if (this.ctx.state === 'suspended') this.ctx.resume?.();
+        return;
+      }
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) return;
+      this.ctx = new Ctor();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.5;
+      this.master.connect(this.ctx.destination);
+      // Quiet ambient drone for atmosphere.
+      this._startAmbient();
+    }
+
+    _now() { return this.ctx ? this.ctx.currentTime : 0; }
+
+    _startAmbient() {
+      if (!this.ctx) return;
+      const ctx = this.ctx;
+      const drone = ctx.createOscillator();
+      drone.type = 'sine';
+      drone.frequency.value = 70;
+      const detune = ctx.createOscillator();
+      detune.type = 'sine';
+      detune.frequency.value = 71.5;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.018;
+      drone.connect(gain); detune.connect(gain); gain.connect(this.master);
+      drone.start(); detune.start();
+      this._ambient = { drone, detune, gain };
+    }
+
+    handleEvents(events, _match) {
+      if (!this.ctx) return;
+      const t = this._now();
+      for (const ev of events) {
+        if (ev.type === 'fire') {
+          if (ev.ownerTeam === E.constants.TEAM_PLAYER) {
+            if (t - this._lastFireAt > 0.05) {
+              this._playShot({ baseFreq: 520, type: 'square', dur: 0.09, gain: 0.18 });
+              this._lastFireAt = t;
+            }
+          } else {
+            // Bots: lower-pitched, slightly quieter.
+            if (t - this._lastBotFireAt > 0.04) {
+              this._playShot({ baseFreq: 230, type: 'sawtooth', dur: 0.11, gain: 0.10 });
+              this._lastBotFireAt = t;
+            }
+          }
+        } else if (ev.type === 'hit') {
+          if (ev.shooterIsPlayer) {
+            // Hit-confirm: bright high ping.
+            this._playPing(880, 0.1, 0.12);
+          }
+          if (ev.victimIsPlayer) {
+            // Player got hit: low thud.
+            this._playThud(180, 0.18, 0.25);
+          }
+        } else if (ev.type === 'kill') {
+          if (ev.killerIsPlayer) {
+            this._playChord([523, 659, 784], 0.32, 0.18);
+          }
+          if (ev.victimIsPlayer) {
+            this._playThud(90, 0.45, 0.30);
+          }
+        } else if (ev.type === 'pickup' && ev.consumerIsPlayer) {
+          this._playChord([660, 880, 1100], 0.22, 0.16);
+        } else if (ev.type === 'countdown') {
+          this._playPing(880, 0.12, 0.15);
+        } else if (ev.type === 'go') {
+          this._playChord([880, 1100, 1320], 0.25, 0.20);
+        } else if (ev.type === 'dash') {
+          this._playSwoosh(0.18, 0.15);
+        }
+      }
+    }
+
+    _playShot({ baseFreq, type, dur, gain }) {
+      const ctx = this.ctx; const t = this._now();
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.setValueAtTime(baseFreq, t);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.35, t + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(gain, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      const filt = ctx.createBiquadFilter();
+      filt.type = 'lowpass';
+      filt.frequency.value = 2500;
+      osc.connect(filt); filt.connect(g); g.connect(this.master);
+      osc.start(t); osc.stop(t + dur + 0.02);
+    }
+
+    _playPing(freq, dur, gain) {
+      const ctx = this.ctx; const t = this._now();
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.4, t + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(gain, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(g); g.connect(this.master);
+      osc.start(t); osc.stop(t + dur + 0.02);
+    }
+
+    _playThud(freq, dur, gain) {
+      const ctx = this.ctx; const t = this._now();
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.4, t + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(gain, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      // Add a touch of noise via a short white-noise burst.
+      const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+      const noise = ctx.createBufferSource();
+      noise.buffer = buf;
+      const ng = ctx.createGain();
+      ng.gain.value = gain * 0.5;
+      noise.connect(ng); ng.connect(this.master);
+      osc.connect(g); g.connect(this.master);
+      osc.start(t); osc.stop(t + dur + 0.02);
+      noise.start(t); noise.stop(t + dur + 0.02);
+    }
+
+    _playChord(freqs, dur, gain) {
+      const ctx = this.ctx; const t = this._now();
+      for (const f of freqs) {
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.value = f;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(gain / freqs.length, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        osc.connect(g); g.connect(this.master);
+        osc.start(t); osc.stop(t + dur + 0.02);
+      }
+    }
+
+    _playSwoosh(dur, gain) {
+      const ctx = this.ctx; const t = this._now();
+      const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) {
+        const k = i / data.length;
+        data[i] = (Math.random() * 2 - 1) * (1 - k);
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buf;
+      const filt = ctx.createBiquadFilter();
+      filt.type = 'bandpass';
+      filt.frequency.setValueAtTime(800, t);
+      filt.frequency.exponentialRampToValueAtTime(2400, t + dur);
+      filt.Q.value = 6;
+      const g = ctx.createGain();
+      g.gain.value = gain;
+      noise.connect(filt); filt.connect(g); g.connect(this.master);
+      noise.start(t); noise.stop(t + dur + 0.02);
+    }
+
+    update(_match, _dt) { /* no-op: ambient runs on its own */ }
   }
 
   CubeClash.adapters = {
     InMemoryMatchRepository, InputAdapter,
-    ThreeRendererAdapter, UIAdapter,
+    ThreeRendererAdapter, UIAdapter, WebAudioAdapter,
   };
 })(window.CubeClash = window.CubeClash || {});

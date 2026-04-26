@@ -37,6 +37,26 @@
   const MATCH_DURATION = 180; // 3 minutes
   const BOT_COUNT = 5;
 
+  // Pre-match grace before AI/projectiles activate. Counts down a 3-2-1-GO
+  // overlay; the match clock itself doesn't tick during this window.
+  const PRE_MATCH_DURATION = 3.0;
+
+  // Dash mechanic: short Shift-triggered burst.
+  const DASH_COOLDOWN = 2.0;     // seconds between dashes
+  const DASH_DURATION = 0.18;    // seconds the dash impulse is active
+  const DASH_SPEED_MULT = 2.6;   // ground speed multiplier while dashing
+
+  // Health pickup placed in the inner ring; respawns this many seconds
+  // after being consumed.
+  const PICKUP_HEAL_AMOUNT = 30;
+  const PICKUP_RESPAWN_DELAY = 12.0;
+  const PICKUP_PICKUP_RADIUS = 1.1;
+
+  // Brief invulnerability window after the player respawns. Without this
+  // five bots can volley the player back to zero hp before they finish
+  // turning toward the action.
+  const RESPAWN_INVULNERABILITY = 1.5;
+
   const TEAM_PLAYER = 'player';
   const TEAM_BOT = 'bot';
 
@@ -84,18 +104,27 @@
       this.kills = 0;
       this.hits = 0;
       this.deaths = 0;
+      this.invulnTimer = 0; // > 0 means damage is ignored (post-respawn grace)
     }
     takeDamage(amount, _attackerId) {
-      if (!this.alive) return false;
-      this.hp -= amount;
+      if (!this.alive) return { died: false, damage: 0 };
+      if (this.invulnTimer > 0) return { died: false, damage: 0 };
+      const dealt = Math.min(amount, this.hp);
+      this.hp -= dealt;
       this.hitFlash = 0.18;
       if (this.hp <= 0) {
         this.hp = 0;
         this.alive = false;
         this.deaths += 1;
-        return true;
+        return { died: true, damage: dealt };
       }
-      return false;
+      return { died: false, damage: dealt };
+    }
+    heal(amount) {
+      if (!this.alive) return 0;
+      const before = this.hp;
+      this.hp = Math.min(this.maxHp, this.hp + amount);
+      return this.hp - before;
     }
     canFire() { return this.alive && this.fireCooldown <= 0; }
   }
@@ -108,6 +137,9 @@
       this.cameraPitch = -0.25;
       this.fireRequested = false;
       this.jumpRequested = false;
+      this.dashRequested = false;
+      this.dashTimer = 0;       // > 0 while the dash impulse is active
+      this.dashCooldown = 0;    // > 0 means dash is on cooldown
       this.moveInput = vec();
     }
   }
@@ -143,27 +175,49 @@
     }
   }
 
+  class Pickup {
+    constructor({ id, kind = 'health', value = PICKUP_HEAL_AMOUNT, position = vec() }) {
+      this.id = id;
+      this.kind = kind;
+      this.value = value;
+      this.position = { ...position };
+      this.alive = true;
+    }
+  }
+
   class Match {
     constructor({ duration = MATCH_DURATION } = {}) {
       this.duration = duration;
       this.timeLeft = duration;
       this.elapsed = 0;
+      this.preMatch = PRE_MATCH_DURATION;
       this.player = new Player();
       this.bots = new Map();
       this.projectiles = new Map();
+      this.pickups = new Map();
       this.pendingBotSpawns = [];
       this.pendingPlayerRespawn = null;
+      this.pendingPickupSpawn = 0; // seconds until next pickup spawns
       this.over = false;
+      // Domain events emitted during a tick (fire, hit, kill, pickup, …).
+      // Adapters drain this list to play sounds, show kill feed, etc.
+      // Keeping events in the entity layer means use cases never reach
+      // out to the renderer/audio/UI directly.
+      this.events = [];
       this._nextProjectileId = 1;
       this._nextBotId = 1;
+      this._nextPickupId = 1;
     }
     nextProjectileId() { return `p-${this._nextProjectileId++}`; }
     nextBotId() { return `bot-${this._nextBotId++}`; }
+    nextPickupId() { return `pickup-${this._nextPickupId++}`; }
+    emit(event) { this.events.push(event); }
     allCombatants() {
       const out = [this.player];
       for (const b of this.bots.values()) out.push(b);
       return out;
     }
+    isPreMatch() { return this.preMatch > 0; }
   }
 
   const BRIGHT_COLORS = [
@@ -176,7 +230,7 @@
   }
 
   CubeClash.entities = {
-    Arena, Player, Bot, Projectile, Match, Combatant,
+    Arena, Player, Bot, Projectile, Pickup, Match, Combatant,
     vec, randomBrightColor,
     constants: {
       ARENA_RADIUS, GRAVITY, PLAYER_SIZE, BOT_SIZE,
@@ -187,6 +241,10 @@
       SCORE_HIT, SCORE_KILL, SCORE_DEATH_PENALTY,
       PLAYER_RESPAWN_DELAY, BOT_RESPAWN_DELAY,
       MATCH_DURATION, BOT_COUNT,
+      PRE_MATCH_DURATION,
+      DASH_COOLDOWN, DASH_DURATION, DASH_SPEED_MULT,
+      PICKUP_HEAL_AMOUNT, PICKUP_RESPAWN_DELAY, PICKUP_PICKUP_RADIUS,
+      RESPAWN_INVULNERABILITY,
       TEAM_PLAYER, TEAM_BOT,
     },
   };

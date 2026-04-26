@@ -15,7 +15,7 @@
 
   const {
     InMemoryMatchRepository, ThreeRendererAdapter,
-    InputAdapter, UIAdapter,
+    InputAdapter, UIAdapter, WebAudioAdapter,
   } = adapters;
   const {
     StartMatchUseCase, UpdateMatchUseCase,
@@ -29,6 +29,11 @@
     const renderer = new ThreeRendererAdapter(canvas);
     const input = new InputAdapter(canvas);
     const ui = new UIAdapter();
+    const audio = new WebAudioAdapter();
+
+    // Web Audio requires a user gesture to start; the input adapter knows
+    // when that happens, so we route the unlock signal through it.
+    input.onUserGesture(() => audio.unlock());
 
     const startMatchUseCase = new StartMatchUseCase({ matchRepository });
     const updateMatchUseCase = new UpdateMatchUseCase({
@@ -81,9 +86,19 @@
           // before the match starts ticking.
           input.sample(dt);
         }
+        // Drain domain events emitted this tick into every adapter that
+        // wants to react. Each adapter consumes only the event types it
+        // cares about; use cases are agnostic of who's listening.
+        if (match.events.length > 0) {
+          renderer.handleEvents(match.events, match);
+          ui.handleEvents(match.events, match);
+          audio.handleEvents(match.events, match);
+          match.events.length = 0;
+        }
         renderer.syncEntities(match);
         renderer.render(match, dt);
         ui.update(match);
+        audio.update(match, dt);
 
         if (match.over && !matchOverShown) {
           ui.showMatchOver(match);
