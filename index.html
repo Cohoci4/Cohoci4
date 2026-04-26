@@ -413,7 +413,6 @@
       network.fire(aimFromAngles(yaw, pitch));
     });
     addEventListener("resize", () => renderer.resize());
-    network.onSnapshot(() => updateHud());
     network.onShot((event) => renderer.addShot(event));
 
     setInterval(() => {

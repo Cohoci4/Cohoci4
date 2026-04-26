@@ -259,7 +259,6 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
-app.use(express.static(__dirname));
 
 io.on("connection", (socket) => {
   const player = new Player(socket.id, randomSpawn());
