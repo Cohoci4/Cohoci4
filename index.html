@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Endless Runner</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a1a;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    canvas {
+      display: block;
+      border-radius: 12px;
+      box-shadow: 0 0 40px rgba(0, 200, 255, 0.15);
+    }
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+// ─── Canvas Setup ───
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width  = Math.min(window.innerWidth - 20, 900);
+  canvas.height = Math.min(window.innerHeight - 20, 500);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ─── Constants ───
+const GRAVITY        = 0.6;
+const JUMP_FORCE     = -13;
+const GROUND_OFFSET  = 60;   // distance from bottom
+const BASE_SPEED     = 5;
+const SPEED_INCREMENT = 0.0005;
+const OBSTACLE_GAP   = 100;  // min frames between obstacles
+const COIN_GAP       = 120;
+
+// ─── Colors ───
+const COLORS = {
+  sky1: '#0f0c29', sky2: '#302b63', sky3: '#24243e',
+  ground: '#1a1a2e', groundLine: '#00d2ff',
+  player: '#00d2ff', playerGlow: 'rgba(0,210,255,0.4)',
+  obstacle: '#ff2e63', obstacleDark: '#b80040',
+  coin: '#ffd700', coinGlow: 'rgba(255,215,0,0.35)',
+  text: '#ffffff', accent: '#00d2ff',
+  gridLine: 'rgba(0,210,255,0.06)',
+  particle: ['#00d2ff', '#ff2e63', '#ffd700', '#7b2ff7']
+};
+
+// ─── Game State ───
+let gameSpeed, score, frameCount, obstacles, coins, particles, stars;
+let gameOver, started;
+
+// ─── Player ───
+const player = { x: 80, y: 0, w: 36, h: 36, vy: 0, grounded: true, rotation: 0 };
+
+// ─── Star background (generated once) ───
+function generateStars() {
+  stars = [];
+  for (let i = 0; i < 80; i++) {
+    stars.push({
+      x: Math.random() * 900,
+      y: Math.random() * 400,
+      r: Math.random() * 1.5 + 0.3,
+      twinkle: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+// ─── Init / Reset ───
+function init() {
+  gameSpeed  = BASE_SPEED;
+  score      = 0;
+  frameCount = 0;
+  obstacles  = [];
+  coins      = [];
+  particles  = [];
+  gameOver   = false;
+  started    = false;
+  player.y   = groundY() - player.h;
+  player.vy  = 0;
+  player.grounded = true;
+  player.rotation = 0;
+  generateStars();
+}
+
+function groundY() { return canvas.height - GROUND_OFFSET; }
+
+// ─── Input ───
+function jump() {
+  if (gameOver) { init(); return; }
+  if (!started) started = true;
+  // No double-jump: only jump when grounded
+  if (player.grounded) {
+    player.vy = JUMP_FORCE;
+    player.grounded = false;
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); jump(); }
+});
+canvas.addEventListener('click', jump);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
+
+// ─── Spawn helpers ───
+let lastObstacleFrame = -OBSTACLE_GAP;
+let lastCoinFrame     = -COIN_GAP;
+
+function spawnObstacle() {
+  if (frameCount - lastObstacleFrame < OBSTACLE_GAP) return;
+  // Random chance each frame after gap
+  if (Math.random() > 0.02) return;
+  const h = 30 + Math.random() * 40;
+  obstacles.push({ x: canvas.width + 10, y: groundY() - h, w: 24 + Math.random() * 16, h });
+  lastObstacleFrame = frameCount;
+}
+
+function spawnCoin() {
+  if (frameCount - lastCoinFrame < COIN_GAP) return;
+  if (Math.random() > 0.015) return;
+  coins.push({ x: canvas.width + 10, y: groundY() - 70 - Math.random() * 80, r: 12, collected: false });
+  lastCoinFrame = frameCount;
+}
+
+// ─── Particles ───
+function emitParticles(x, y, count, color) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 1) * 5,
+      r: Math.random() * 3 + 1,
+      life: 30 + Math.random() * 20,
+      maxLife: 50,
+      color: color || COLORS.particle[Math.floor(Math.random() * COLORS.particle.length)]
+    });
+  }
+}
+
+// ─── Collision (AABB) ───
+function collides(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function collidesCircle(player, coin) {
+  const cx = player.x + player.w / 2;
+  const cy = player.y + player.h / 2;
+  const dx = cx - coin.x;
+  const dy = cy - coin.y;
+  return Math.sqrt(dx * dx + dy * dy) < player.w / 2 + coin.r;
+}
+
+// ─── Update ───
+function update() {
+  if (!started || gameOver) return;
+  frameCount++;
+  // Accelerate over time
+  gameSpeed = BASE_SPEED + frameCount * SPEED_INCREMENT;
+
+  // Player physics
+  player.vy += GRAVITY;
+  player.y  += player.vy;
+  if (player.y >= groundY() - player.h) {
+    player.y = groundY() - player.h;
+    player.vy = 0;
+    player.grounded = true;
+  }
+  // Rotate while in air
+  if (!player.grounded) {
+    player.rotation += 0.08;
+  } else {
+    player.rotation = 0;
+  }
+
+  // Obstacles
+  spawnObstacle();
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    obstacles[i].x -= gameSpeed;
+    // Scored when obstacle passes player
+    if (!obstacles[i].scored && obstacles[i].x + obstacles[i].w < player.x) {
+      obstacles[i].scored = true;
+      score++;
+    }
+    if (obstacles[i].x + obstacles[i].w < -10) {
+      obstacles.splice(i, 1);
+      continue;
+    }
+    // Collision check
+    if (collides(player, obstacles[i])) {
+      gameOver = true;
+      emitParticles(player.x + player.w / 2, player.y + player.h / 2, 30, '#ff2e63');
+    }
+  }
+
+  // Coins
+  spawnCoin();
+  for (let i = coins.length - 1; i >= 0; i--) {
+    coins[i].x -= gameSpeed;
+    if (coins[i].x + coins[i].r < -10) { coins.splice(i, 1); continue; }
+    if (!coins[i].collected && collidesCircle(player, coins[i])) {
+      coins[i].collected = true;
+      score += 3;
+      emitParticles(coins[i].x, coins[i].y, 12, COLORS.coin);
+      coins.splice(i, 1);
+    }
+  }
+
+  // Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x  += p.vx;
+    p.y  += p.vy;
+    p.vy += 0.1;
+    p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+// ─── Drawing helpers ───
+function drawBackground() {
+  // Gradient sky
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, COLORS.sky1);
+  grad.addColorStop(0.5, COLORS.sky2);
+  grad.addColorStop(1, COLORS.sky3);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Stars
+  for (const s of stars) {
+    s.twinkle += 0.02;
+    const alpha = 0.4 + Math.sin(s.twinkle) * 0.3;
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(s.x * (canvas.width / 900), s.y * (canvas.height / 500), s.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Grid lines
+  ctx.strokeStyle = COLORS.gridLine;
+  ctx.lineWidth = 1;
+  const gridSize = 50;
+  const offset = started ? (frameCount * gameSpeed) % gridSize : 0;
+  for (let x = -offset; x < canvas.width; x += gridSize) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, groundY()); ctx.stroke();
+  }
+  for (let y = 0; y < groundY(); y += gridSize) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+}
+
+function drawGround() {
+  // Ground fill
+  ctx.fillStyle = COLORS.ground;
+  ctx.fillRect(0, groundY(), canvas.width, GROUND_OFFSET);
+  // Neon line
+  ctx.strokeStyle = COLORS.groundLine;
+  ctx.lineWidth = 2;
+  ctx.shadowColor = COLORS.groundLine;
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(0, groundY());
+  ctx.lineTo(canvas.width, groundY());
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function drawPlayer() {
+  ctx.save();
+  const cx = player.x + player.w / 2;
+  const cy = player.y + player.h / 2;
+  ctx.translate(cx, cy);
+  ctx.rotate(player.rotation);
+
+  // Glow
+  ctx.shadowColor = COLORS.playerGlow;
+  ctx.shadowBlur = 18;
+  // Body (rounded square)
+  ctx.fillStyle = COLORS.player;
+  const r = 6;
+  const hw = player.w / 2, hh = player.h / 2;
+  ctx.beginPath();
+  ctx.moveTo(-hw + r, -hh);
+  ctx.lineTo(hw - r, -hh);
+  ctx.quadraticCurveTo(hw, -hh, hw, -hh + r);
+  ctx.lineTo(hw, hh - r);
+  ctx.quadraticCurveTo(hw, hh, hw - r, hh);
+  ctx.lineTo(-hw + r, hh);
+  ctx.quadraticCurveTo(-hw, hh, -hw, hh - r);
+  ctx.lineTo(-hw, -hh + r);
+  ctx.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
+  ctx.closePath();
+  ctx.fill();
+
+  // Eye (gives character)
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(6, -4, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#0a0a1a';
+  ctx.beginPath();
+  ctx.arc(7, -4, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawObstacles() {
+  for (const o of obstacles) {
+    // Shadow
+    ctx.fillStyle = COLORS.obstacleDark;
+    ctx.fillRect(o.x + 3, o.y + 3, o.w, o.h);
+    // Body
+    ctx.fillStyle = COLORS.obstacle;
+    ctx.shadowColor = COLORS.obstacle;
+    ctx.shadowBlur = 8;
+    ctx.fillRect(o.x, o.y, o.w, o.h);
+    ctx.shadowBlur = 0;
+    // Top stripe
+    ctx.fillStyle = '#ff6b8a';
+    ctx.fillRect(o.x, o.y, o.w, 4);
+  }
+}
+
+function drawCoins() {
+  const bob = Math.sin(frameCount * 0.08) * 4;
+  for (const c of coins) {
+    if (c.collected) continue;
+    ctx.save();
+    ctx.translate(c.x, c.y + bob);
+    // Glow
+    ctx.shadowColor = COLORS.coinGlow;
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = COLORS.coin;
+    ctx.beginPath();
+    ctx.arc(0, 0, c.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Inner circle
+    ctx.strokeStyle = '#b8960a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, c.r - 4, 0, Math.PI * 2);
+    ctx.stroke();
+    // $ sign
+    ctx.fillStyle = '#b8960a';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('$', 0, 1);
+    ctx.restore();
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const alpha = p.life / p.maxLife;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHUD() {
+  // Score
+  ctx.fillStyle = COLORS.text;
+  ctx.font = 'bold 22px "Segoe UI", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`Score: ${score}`, 20, 36);
+  // Speed indicator
+  ctx.font = '14px "Segoe UI", sans-serif';
+  ctx.fillStyle = COLORS.accent;
+  ctx.fillText(`Speed: ${gameSpeed.toFixed(1)}`, 20, 58);
+}
+
+function drawStartScreen() {
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = COLORS.accent;
+  ctx.font = 'bold 40px "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('ENDLESS RUNNER', canvas.width / 2, canvas.height / 2 - 30);
+  ctx.fillStyle = COLORS.text;
+  ctx.font = '20px "Segoe UI", sans-serif';
+  ctx.fillText('Press SPACE or tap to start', canvas.width / 2, canvas.height / 2 + 20);
+}
+
+function drawGameOver() {
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#ff2e63';
+  ctx.font = 'bold 48px "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 30);
+  ctx.fillStyle = COLORS.text;
+  ctx.font = '22px "Segoe UI", sans-serif';
+  ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 15);
+  // Restart button
+  const bw = 180, bh = 46;
+  const bx = canvas.width / 2 - bw / 2, by = canvas.height / 2 + 40;
+  ctx.fillStyle = COLORS.accent;
+  ctx.beginPath();
+  ctx.moveTo(bx + 10, by);
+  ctx.lineTo(bx + bw - 10, by);
+  ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + 10);
+  ctx.lineTo(bx + bw, by + bh - 10);
+  ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - 10, by + bh);
+  ctx.lineTo(bx + 10, by + bh);
+  ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - 10);
+  ctx.lineTo(bx, by + 10);
+  ctx.quadraticCurveTo(bx, by, bx + 10, by);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#0a0a1a';
+  ctx.font = 'bold 20px "Segoe UI", sans-serif';
+  ctx.fillText('RESTART', canvas.width / 2, by + bh / 2 + 7);
+}
+
+// ─── Main Loop (60 FPS via requestAnimationFrame) ───
+function loop() {
+  update();
+  drawBackground();
+  drawGround();
+  drawObstacles();
+  drawCoins();
+  drawPlayer();
+  drawParticles();
+  if (started && !gameOver) drawHUD();
+  if (!started) drawStartScreen();
+  if (gameOver) { drawHUD(); drawGameOver(); }
+  requestAnimationFrame(loop);
+}
+
+init();
+loop();
+</script>
+</body>
+</html>
