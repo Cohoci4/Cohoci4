@@ -1,0 +1,15 @@
+{
+  "name": "cyber-rangers",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal real-time multiplayer 3D cyberpunk browser game.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
