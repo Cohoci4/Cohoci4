@@ -5,709 +5,562 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Endless Runner Online</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #0a0a1a;
-      color: #fff;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      display: flex; flex-direction: column;
-      justify-content: center; align-items: center;
-      min-height: 100vh; overflow: hidden;
-    }
-    canvas { display: none; border-radius: 12px; box-shadow: 0 0 40px rgba(0,200,255,0.15); }
-
-    /* ─── UI Screens ─── */
-    .screen { display: none; flex-direction: column; align-items: center; text-align: center; padding: 20px; }
-    .screen.active { display: flex; }
-    h1 { color: #00d2ff; font-size: 44px; margin-bottom: 6px; text-shadow: 0 0 20px rgba(0,210,255,0.4); }
-    .sub { color: #888; font-size: 14px; margin-bottom: 30px; }
-    input {
-      background: #151530; border: 2px solid #333; color: #fff;
-      padding: 12px 20px; margin: 6px 0; border-radius: 8px; font-size: 16px;
-      width: 280px; outline: none; font-family: inherit;
-    }
-    input:focus { border-color: #00d2ff; }
-    .btn {
-      background: transparent; border: 2px solid #00d2ff; color: #00d2ff;
-      padding: 12px 40px; margin: 8px 4px; border-radius: 8px; font-size: 18px;
-      cursor: pointer; transition: all 0.2s; font-family: inherit;
-    }
-    .btn:hover { background: #00d2ff; color: #0a0a1a; }
-    .btn.purple { border-color: #7b2ff7; color: #7b2ff7; }
-    .btn.purple:hover { background: #7b2ff7; color: #fff; }
-    .btn.red { border-color: #ff2e63; color: #ff2e63; }
-    .btn.red:hover { background: #ff2e63; color: #fff; }
-    .btn.small { padding: 8px 20px; font-size: 14px; }
-    .error { color: #ff2e63; font-size: 14px; margin: 8px 0; min-height: 20px; }
-    .link { color: #00d2ff; cursor: pointer; font-size: 14px; margin-top: 12px; }
-    .link:hover { text-decoration: underline; }
-
-    /* Lobby */
-    .room-list { width: 340px; max-height: 260px; overflow-y: auto; margin: 12px 0; }
-    .room-item {
-      background: #151530; border: 1px solid #252550; border-radius: 8px;
-      padding: 12px 16px; margin: 6px 0; display: flex; justify-content: space-between; align-items: center;
-    }
-    .room-item .info { text-align: left; }
-    .room-item .rid { color: #00d2ff; font-weight: bold; font-size: 16px; }
-    .room-item .players { color: #888; font-size: 13px; }
-    .badge {
-      display: inline-block; padding: 3px 10px; border-radius: 12px;
-      font-size: 11px; font-weight: bold;
-    }
-    .badge.waiting { background: #39ff14; color: #000; }
-    .badge.playing { background: #ff8c00; color: #000; }
-    .stats { color: #666; font-size: 13px; margin-top: 8px; }
-
-    /* Waiting screen */
-    .waiting-text { color: #00d2ff; font-size: 22px; margin: 20px 0; }
-    .room-code { color: #ffd700; font-size: 36px; font-weight: bold; letter-spacing: 4px; margin: 10px 0; }
-    .pulse { animation: pulse 1.5s ease-in-out infinite; }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-    /* Toast */
-    #toast {
-      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-      background: #151530; border: 1px solid #00d2ff; color: #fff;
-      padding: 10px 24px; border-radius: 8px; font-size: 14px;
-      display: none; z-index: 100; box-shadow: 0 0 20px rgba(0,210,255,0.2);
-    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#0a0a1a;color:#fff;font-family:'Segoe UI',Tahoma,sans-serif;
+      display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;overflow:hidden}
+    canvas{display:none;border-radius:12px;box-shadow:0 0 40px rgba(0,200,255,.15)}
+    .screen{display:none;flex-direction:column;align-items:center;text-align:center;padding:20px;max-width:420px;width:100%}
+    .screen.active{display:flex}
+    h1{color:#00d2ff;font-size:42px;margin-bottom:6px;text-shadow:0 0 20px rgba(0,210,255,.4)}
+    h2{color:#00d2ff;font-size:28px;margin-bottom:12px}
+    .sub{color:#888;font-size:14px;margin-bottom:24px}
+    input{background:#151530;border:2px solid #333;color:#fff;padding:12px 18px;margin:5px 0;border-radius:8px;
+      font-size:16px;width:100%;outline:none;font-family:inherit}
+    input:focus{border-color:#00d2ff}
+    .btn{background:transparent;border:2px solid #00d2ff;color:#00d2ff;padding:11px 36px;margin:6px 4px;
+      border-radius:8px;font-size:17px;cursor:pointer;transition:all .2s;font-family:inherit;min-width:120px}
+    .btn:hover{background:#00d2ff;color:#0a0a1a}
+    .btn.purple{border-color:#7b2ff7;color:#7b2ff7}.btn.purple:hover{background:#7b2ff7;color:#fff}
+    .btn.red{border-color:#ff2e63;color:#ff2e63}.btn.red:hover{background:#ff2e63;color:#fff}
+    .btn.green{border-color:#39ff14;color:#39ff14}.btn.green:hover{background:#39ff14;color:#0a0a1a}
+    .btn.sm{padding:7px 18px;font-size:13px;min-width:auto}
+    .btn.wide{width:100%;margin:6px 0}
+    .error{color:#ff2e63;font-size:13px;margin:6px 0;min-height:18px}
+    .link{color:#00d2ff;cursor:pointer;font-size:13px;margin-top:10px}.link:hover{text-decoration:underline}
+    .row{display:flex;gap:8px;width:100%;justify-content:center;flex-wrap:wrap}
+    .room-list{width:100%;max-height:220px;overflow-y:auto;margin:10px 0}
+    .room-item{background:#151530;border:1px solid #252550;border-radius:8px;padding:10px 14px;margin:5px 0;
+      display:flex;justify-content:space-between;align-items:center}
+    .room-item .rid{color:#00d2ff;font-weight:bold}.room-item .pl{color:#888;font-size:12px}
+    .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:bold}
+    .badge.playing{background:#39ff14;color:#000}
+    .room-code{color:#ffd700;font-size:34px;font-weight:bold;letter-spacing:4px;margin:8px 0}
+    .pulse{animation:pulse 1.5s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    #toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#151530;border:1px solid #00d2ff;
+      color:#fff;padding:8px 20px;border-radius:8px;font-size:13px;display:none;z-index:100}
+    .settings-group{width:100%;text-align:left;margin:10px 0}
+    .settings-group label{display:block;color:#aaa;font-size:13px;margin:8px 0 4px}
+    .settings-group select,.settings-group input[type=range]{width:100%;background:#151530;color:#fff;
+      border:1px solid #333;border-radius:6px;padding:8px;font-size:14px;font-family:inherit}
+    .settings-group select{cursor:pointer}
+    .settings-group input[type=range]{padding:4px 0;accent-color:#00d2ff}
+    .range-val{color:#00d2ff;font-size:12px;float:right}
+    .controls-hint{background:#151530;border-radius:8px;padding:12px;margin:10px 0;width:100%;text-align:left;
+      font-size:13px;color:#aaa;line-height:1.6}
+    .controls-hint b{color:#fff}
+    .sep{height:1px;background:#252550;width:100%;margin:12px 0}
   </style>
 </head>
 <body>
-
 <div id="toast"></div>
 
-<!-- Auth Screen -->
+<!-- ═══ Auth Screen ═══ -->
 <div id="auth-screen" class="screen active">
   <h1>ENDLESS RUNNER</h1>
   <p class="sub">Online Multiplayer</p>
-  <div id="login-form">
-    <input id="auth-user" type="text" placeholder="Username" maxlength="20" autocomplete="off">
-    <input id="auth-pass" type="password" placeholder="Password" maxlength="30">
-    <div class="error" id="auth-error"></div>
-    <button class="btn" id="btn-login" onclick="doLogin()">Login</button>
-    <button class="btn purple" id="btn-register" onclick="doRegister()">Register</button>
+  <input id="auth-user" placeholder="Username" maxlength="20" autocomplete="off">
+  <input id="auth-pass" type="password" placeholder="Password" maxlength="30">
+  <div class="error" id="auth-error"></div>
+  <div class="row">
+    <button class="btn" onclick="doLogin()">Login</button>
+    <button class="btn purple" onclick="doRegister()">Register</button>
   </div>
 </div>
 
-<!-- Lobby Screen -->
+<!-- ═══ Main Menu ═══ -->
+<div id="menu-screen" class="screen">
+  <h1 style="font-size:34px">MAIN MENU</h1>
+  <p class="sub">Welcome, <span id="menu-user"></span></p>
+  <button class="btn wide" onclick="showScreen('lobby-screen');refreshRooms()">Play Online</button>
+  <button class="btn wide green" onclick="startOffline()">Play Offline (Solo)</button>
+  <button class="btn wide purple" onclick="showScreen('settings-screen')">Settings</button>
+  <div class="sep"></div>
+  <button class="btn sm red" onclick="logout()">Logout</button>
+</div>
+
+<!-- ═══ Settings ═══ -->
+<div id="settings-screen" class="screen">
+  <h2>Settings</h2>
+  <div class="settings-group">
+    <label>Difficulty <span class="range-val" id="diff-val">Normal</span></label>
+    <select id="set-difficulty" onchange="updateDiffLabel()">
+      <option value="easy">Easy</option>
+      <option value="normal" selected>Normal</option>
+      <option value="hard">Hard</option>
+      <option value="insane">Insane</option>
+    </select>
+  </div>
+  <div class="settings-group">
+    <label>Game Speed Multiplier <span class="range-val" id="speed-val">1.0x</span></label>
+    <input type="range" id="set-speed" min="0.5" max="2" step="0.1" value="1" oninput="document.getElementById('speed-val').textContent=this.value+'x'">
+  </div>
+  <div class="settings-group">
+    <label>Show FPS Counter</label>
+    <select id="set-fps">
+      <option value="0">Off</option>
+      <option value="1">On</option>
+    </select>
+  </div>
+  <div class="controls-hint">
+    <b>Controls:</b><br>
+    Jump: <b>SPACE</b> / <b>Click</b> / <b>Tap</b><br>
+    Online: same key for your character<br>
+    Offline 2P: P1 = <b>SPACE</b>, P2 = <b>W</b>
+  </div>
+  <div class="sep"></div>
+  <button class="btn wide" onclick="showScreen('menu-screen')">Back</button>
+</div>
+
+<!-- ═══ Lobby ═══ -->
 <div id="lobby-screen" class="screen">
-  <h1 style="font-size:32px;">LOBBY</h1>
-  <p class="sub">Welcome, <span id="lobby-user"></span></p>
-  <div style="display:flex;gap:8px;margin-bottom:12px;">
+  <h2>LOBBY</h2>
+  <p class="sub">Create or join a room</p>
+  <div class="row">
     <button class="btn" onclick="createRoom()">Create Room</button>
-    <button class="btn small" onclick="refreshRooms()">Refresh</button>
+    <button class="btn sm" onclick="refreshRooms()">Refresh</button>
   </div>
   <div class="room-list" id="room-list"></div>
-  <div class="stats" id="player-stats"></div>
+  <div class="sep"></div>
+  <button class="btn wide red" onclick="showScreen('menu-screen')">Back to Menu</button>
 </div>
 
-<!-- Waiting in room -->
-<div id="waiting-screen" class="screen">
-  <h1 style="font-size:28px;">ROOM</h1>
-  <div class="room-code" id="wait-room-id"></div>
-  <p class="waiting-text pulse">Waiting for opponent...</p>
-  <p style="color:#888;font-size:13px;margin-top:8px;">Share the room code with a friend</p>
-  <button class="btn red small" style="margin-top:20px;" onclick="leaveRoom()">Leave</button>
-</div>
-
-<!-- Game Canvas -->
+<!-- ═══ Canvas (game) ═══ -->
 <canvas id="game"></canvas>
 
 <script>
-// ─── WebSocket ───
-const WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
-let ws = null;
-let myUsername = '';
-let myPlayerIndex = 0;
-let currentRoomId = '';
-let gameSeed = 0;
-let opponentUsername = '';
+// ═══════════════════════════════════════
+// ─── NETWORKING ───
+// ═══════════════════════════════════════
+const WS_URL = (location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
+let ws=null, myUsername='', myPlayerIndex=0, currentRoomId='', gameSeed=0, opponentUsername='';
 
-function connectWS() {
-  ws = new WebSocket(WS_URL);
-  ws.onopen = () => {};
-  ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
-    handleMessage(msg);
-  };
-  ws.onclose = () => {
-    setTimeout(connectWS, 2000);
-  };
+function connectWS(){
+  ws=new WebSocket(WS_URL);
+  ws.onmessage=e=>handleMessage(JSON.parse(e.data));
+  ws.onclose=()=>setTimeout(connectWS,2000);
 }
 connectWS();
+function send(o){if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));}
 
-function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
-
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  const el = document.getElementById(id);
-  if (el) el.classList.add('active');
-  document.getElementById('game').style.display = (id === 'game-screen') ? 'block' : 'none';
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById(id);
+  if(el)el.classList.add('active');
+  canvas.style.display=(id==='game-active')?'block':'none';
 }
-
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.style.display = 'block';
-  setTimeout(() => t.style.display = 'none', 3000);
-}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',3000);}
 
 // ─── Auth ───
-function doLogin() {
-  const u = document.getElementById('auth-user').value.trim();
-  const p = document.getElementById('auth-pass').value;
-  if (!u || !p) return;
-  send({ action: 'login', username: u, password: p });
+function doLogin(){
+  const u=document.getElementById('auth-user').value.trim(),p=document.getElementById('auth-pass').value;
+  if(!u||!p)return; send({action:'login',username:u,password:p});
 }
-function doRegister() {
-  const u = document.getElementById('auth-user').value.trim();
-  const p = document.getElementById('auth-pass').value;
-  if (!u || !p) return;
-  send({ action: 'register', username: u, password: p });
+function doRegister(){
+  const u=document.getElementById('auth-user').value.trim(),p=document.getElementById('auth-pass').value;
+  if(!u||!p)return; send({action:'register',username:u,password:p});
 }
-document.getElementById('auth-pass').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
-});
+function logout(){myUsername='';showScreen('auth-screen');}
+document.getElementById('auth-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+function updateDiffLabel(){document.getElementById('diff-val').textContent=document.getElementById('set-difficulty').value;}
 
 // ─── Lobby ───
-function createRoom() { send({ action: 'create_room' }); }
-function refreshRooms() { send({ action: 'list_rooms' }); }
-function joinRoom(rid) { send({ action: 'join_room', room_id: rid }); }
-function leaveRoom() { send({ action: 'leave_room' }); showScreen('lobby-screen'); refreshRooms(); }
+function createRoom(){send({action:'create_room'});}
+function refreshRooms(){send({action:'list_rooms'});}
+function joinRoom(rid){send({action:'join_room',room_id:rid});}
+function leaveCurrentGame(){
+  send({action:'leave_room'});
+  currentRoomId='';onlineMode=false;offlineMode=false;
+  showScreen('menu-screen');
+}
 
-function renderRooms(roomArr) {
-  const el = document.getElementById('room-list');
-  if (roomArr.length === 0) {
-    el.innerHTML = '<p style="color:#555;padding:20px;">No rooms yet. Create one!</p>';
-    return;
-  }
-  el.innerHTML = roomArr.map(r => {
-    const canJoin = r.state === 'waiting' && r.players.length < 2 && !r.players.includes(myUsername);
-    return `<div class="room-item">
-      <div class="info">
-        <div class="rid">${r.id}</div>
-        <div class="players">${r.players.join(', ')}</div>
-      </div>
-      <div>
-        <span class="badge ${r.state}">${r.state}</span>
-        ${canJoin ? `<button class="btn small" style="margin-left:8px;" onclick="joinRoom('${r.id}')">Join</button>` : ''}
-      </div>
-    </div>`;
+function renderRooms(arr){
+  const el=document.getElementById('room-list');
+  if(!arr.length){el.innerHTML='<p style="color:#555;padding:16px">No open rooms. Create one!</p>';return;}
+  el.innerHTML=arr.map(r=>{
+    const canJoin=r.players.length<2&&!r.players.includes(myUsername);
+    return `<div class="room-item"><div><span class="rid">${r.id}</span>
+      <span class="pl"> — ${r.players.join(', ')}</span></div>
+      <div><span class="badge playing">${r.state}</span>
+      ${canJoin?`<button class="btn sm" style="margin-left:6px" onclick="joinRoom('${r.id}')">Join</button>`:''}</div></div>`;
   }).join('');
 }
 
 // ─── Message handler ───
-function handleMessage(msg) {
-  switch (msg.action) {
+function handleMessage(msg){
+  switch(msg.action){
     case 'error':
-      document.getElementById('auth-error').textContent = msg.msg;
-      toast(msg.msg);
-      break;
-    case 'registered':
-    case 'logged_in':
-      myUsername = msg.username;
-      document.getElementById('lobby-user').textContent = myUsername;
-      if (msg.wins !== undefined) {
-        document.getElementById('player-stats').textContent = `Wins: ${msg.wins} | Games: ${msg.games}`;
-      }
-      showScreen('lobby-screen');
-      refreshRooms();
-      break;
-    case 'room_list':
-      renderRooms(msg.rooms);
-      break;
-    case 'room_created':
-      currentRoomId = msg.room_id;
-      document.getElementById('wait-room-id').textContent = msg.room_id;
-      showScreen('waiting-screen');
-      break;
-    case 'room_joined':
-      currentRoomId = msg.room_id;
-      break;
-    case 'player_joined':
-      toast(`${msg.username} joined!`);
-      break;
+      document.getElementById('auth-error').textContent=msg.msg; toast(msg.msg); break;
+    case 'registered': case 'logged_in':
+      myUsername=msg.username;
+      document.getElementById('menu-user').textContent=myUsername;
+      showScreen('menu-screen'); break;
+    case 'room_list': renderRooms(msg.rooms); break;
+    case 'room_created': currentRoomId=msg.room_id; break;
     case 'game_start':
-      gameSeed = msg.seed;
-      myPlayerIndex = msg.player_index;
-      opponentUsername = msg.players[1 - myPlayerIndex];
-      startOnlineGame();
-      break;
-    case 'opponent_jump':
-      if (onlineMode) handleOpponentJump(msg.frame);
-      break;
-    case 'opponent_died':
-      if (onlineMode) handleOpponentDied(msg.score, msg.frame);
-      break;
-    case 'opponent_game_over':
-      if (onlineMode) handleOpponentGameOver(msg.score);
-      break;
-    case 'opponent_left':
-      toast(`${msg.username} left the game`);
-      if (onlineMode) {
-        handleOpponentDied(0, frameCount);
-      }
-      currentRoomId = '';
-      break;
+      gameSeed=msg.seed; myPlayerIndex=msg.player_index;
+      currentRoomId=msg.room_id||currentRoomId;
+      opponentUsername=msg.players.length>1?msg.players[1-myPlayerIndex]:'';
+      startOnlineGame(msg.solo); break;
+    case 'player_joined_midgame':
+      opponentUsername=msg.username; toast(opponentUsername+' joined!');
+      if(onlineMode) addOpponentMidgame(); break;
+    case 'opponent_jump': if(onlineMode) opponentJumpQueue.push(msg.frame); break;
+    case 'opponent_died': if(onlineMode){const o=myPlayerIndex===0?player2:player1;if(o){o.alive=false;opponentScore=msg.score;}if(allDead())gameOver=true;} break;
+    case 'opponent_game_over': opponentScore=msg.score; break;
+    case 'opponent_left': toast((msg.username||'Opponent')+' left'); if(onlineMode){const o=myPlayerIndex===0?player2:player1;if(o){o.alive=false;}opponentUsername='';} break;
+    case 'left_room': break;
   }
 }
 
-// ═══════════════════════════════════════════════
+// ═══════════════════════════════════════
 // ─── GAME ENGINE ───
-// ═══════════════════════════════════════════════
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+// ═══════════════════════════════════════
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+function resizeCanvas(){canvas.width=Math.min(window.innerWidth-20,960);canvas.height=Math.min(window.innerHeight-20,520);}
+resizeCanvas(); window.addEventListener('resize',resizeCanvas);
 
-function resizeCanvas() {
-  canvas.width  = Math.min(window.innerWidth - 20, 960);
-  canvas.height = Math.min(window.innerHeight - 20, 520);
+let GRAVITY=0.6, JUMP_FORCE=-13;
+const GROUND_OFFSET=60;
+let BASE_SPEED=5, SPEED_INCREMENT=0.0004;
+const OBSTACLE_GAP=90, COIN_GAP=110, STAGE_DURATION=600;
+
+function getSettings(){
+  const diff=document.getElementById('set-difficulty').value;
+  const speedMul=parseFloat(document.getElementById('set-speed').value);
+  const showFps=document.getElementById('set-fps').value==='1';
+  let bs=5,si=0.0004,jf=-13,grav=0.6;
+  if(diff==='easy'){bs=4;si=0.0002;jf=-14;grav=0.5;}
+  else if(diff==='hard'){bs=6;si=0.0006;jf=-12.5;grav=0.65;}
+  else if(diff==='insane'){bs=7.5;si=0.001;jf=-12;grav=0.7;}
+  return{baseSpeed:bs*speedMul,speedInc:si*speedMul,jumpForce:jf,gravity:grav,showFps};
 }
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
 
-const GRAVITY = 0.6, JUMP_FORCE = -13, GROUND_OFFSET = 60;
-const BASE_SPEED = 5, SPEED_INCREMENT = 0.0004;
-const OBSTACLE_GAP = 90, COIN_GAP = 110, STAGE_DURATION = 600;
-
-// Seeded RNG for deterministic obstacle/coin generation
-function seededRNG(seed) {
-  let s = seed;
-  return function() {
-    s = (s * 1664525 + 1013904223) & 0xFFFFFFFF;
-    return (s >>> 0) / 0xFFFFFFFF;
-  };
-}
+function seededRNG(seed){let s=seed;return function(){s=(s*1664525+1013904223)&0xFFFFFFFF;return(s>>>0)/0xFFFFFFFF;};}
 let rng;
 
-// ─── Biomes ───
-const BIOMES = [
-  { name:'Neon City', sky1:'#0f0c29', sky2:'#302b63', sky3:'#24243e', ground:'#1a1a2e', groundLine:'#00d2ff',
-    mountain:'#1a1a3e', mountainMid:'#252550', mountainFar:'#15152d', cloudColor:'rgba(0,210,255,0.07)',
-    gridColor:'rgba(0,210,255,0.06)', obstacle:'#ff2e63', obstacleDark:'#b80040', obstacleTop:'#ff6b8a', accent:'#00d2ff' },
-  { name:'Sunset Desert', sky1:'#1a0a2e', sky2:'#4a1942', sky3:'#b55400', ground:'#2a1a0e', groundLine:'#ff8c00',
-    mountain:'#3d1f0a', mountainMid:'#5a2f10', mountainFar:'#2a1508', cloudColor:'rgba(255,140,0,0.08)',
-    gridColor:'rgba(255,140,0,0.05)', obstacle:'#ff4500', obstacleDark:'#a02d00', obstacleTop:'#ff7744', accent:'#ff8c00' },
-  { name:'Toxic Jungle', sky1:'#0a1a0a', sky2:'#0d2b0d', sky3:'#1a3a1a', ground:'#0e1e0e', groundLine:'#39ff14',
-    mountain:'#0d2a0d', mountainMid:'#143814', mountainFar:'#091c09', cloudColor:'rgba(57,255,20,0.06)',
-    gridColor:'rgba(57,255,20,0.05)', obstacle:'#ff1493', obstacleDark:'#a00060', obstacleTop:'#ff69b4', accent:'#39ff14' },
-  { name:'Frozen Tundra', sky1:'#0a1929', sky2:'#1a3a5c', sky3:'#2a5a8c', ground:'#1a2a3a', groundLine:'#88ddff',
-    mountain:'#1a3050', mountainMid:'#254060', mountainFar:'#0f2035', cloudColor:'rgba(136,221,255,0.08)',
-    gridColor:'rgba(136,221,255,0.05)', obstacle:'#00bfff', obstacleDark:'#0080aa', obstacleTop:'#66d9ff', accent:'#88ddff' },
-  { name:'Lava Core', sky1:'#1a0000', sky2:'#3a0a0a', sky3:'#5a1a00', ground:'#2a0a0a', groundLine:'#ff4400',
-    mountain:'#3a0e0e', mountainMid:'#4a1515', mountainFar:'#200808', cloudColor:'rgba(255,68,0,0.08)',
-    gridColor:'rgba(255,68,0,0.05)', obstacle:'#ffaa00', obstacleDark:'#b07000', obstacleTop:'#ffcc44', accent:'#ff4400' }
+const BIOMES=[
+  {name:'Neon City',sky1:'#0f0c29',sky2:'#302b63',sky3:'#24243e',ground:'#1a1a2e',groundLine:'#00d2ff',mountain:'#1a1a3e',mountainMid:'#252550',mountainFar:'#15152d',cloudColor:'rgba(0,210,255,.07)',gridColor:'rgba(0,210,255,.06)',obstacle:'#ff2e63',obstacleDark:'#b80040',obstacleTop:'#ff6b8a',accent:'#00d2ff'},
+  {name:'Sunset Desert',sky1:'#1a0a2e',sky2:'#4a1942',sky3:'#b55400',ground:'#2a1a0e',groundLine:'#ff8c00',mountain:'#3d1f0a',mountainMid:'#5a2f10',mountainFar:'#2a1508',cloudColor:'rgba(255,140,0,.08)',gridColor:'rgba(255,140,0,.05)',obstacle:'#ff4500',obstacleDark:'#a02d00',obstacleTop:'#ff7744',accent:'#ff8c00'},
+  {name:'Toxic Jungle',sky1:'#0a1a0a',sky2:'#0d2b0d',sky3:'#1a3a1a',ground:'#0e1e0e',groundLine:'#39ff14',mountain:'#0d2a0d',mountainMid:'#143814',mountainFar:'#091c09',cloudColor:'rgba(57,255,20,.06)',gridColor:'rgba(57,255,20,.05)',obstacle:'#ff1493',obstacleDark:'#a00060',obstacleTop:'#ff69b4',accent:'#39ff14'},
+  {name:'Frozen Tundra',sky1:'#0a1929',sky2:'#1a3a5c',sky3:'#2a5a8c',ground:'#1a2a3a',groundLine:'#88ddff',mountain:'#1a3050',mountainMid:'#254060',mountainFar:'#0f2035',cloudColor:'rgba(136,221,255,.08)',gridColor:'rgba(136,221,255,.05)',obstacle:'#00bfff',obstacleDark:'#0080aa',obstacleTop:'#66d9ff',accent:'#88ddff'},
+  {name:'Lava Core',sky1:'#1a0000',sky2:'#3a0a0a',sky3:'#5a1a00',ground:'#2a0a0a',groundLine:'#ff4400',mountain:'#3a0e0e',mountainMid:'#4a1515',mountainFar:'#200808',cloudColor:'rgba(255,68,0,.08)',gridColor:'rgba(255,68,0,.05)',obstacle:'#ffaa00',obstacleDark:'#b07000',obstacleTop:'#ffcc44',accent:'#ff4400'}
 ];
 
-const P1_COLOR = '#00d2ff', P1_GLOW = 'rgba(0,210,255,0.4)';
-const P2_COLOR = '#7b2ff7', P2_GLOW = 'rgba(123,47,247,0.4)';
+const P1_COLOR='#00d2ff',P1_GLOW='rgba(0,210,255,.4)',P2_COLOR='#7b2ff7',P2_GLOW='rgba(123,47,247,.4)';
 
-let gameSpeed, frameCount, obstacles, coins, particles, stars;
-let gameOver, started, onlineMode = false, gameLoopRunning = false;
-let currentBiome, nextBiomeAt, biomeTransition, prevBiome;
-let lastObstacleFrame, lastCoinFrame;
-let bgLayers, clouds;
-let player1, player2;
-let opponentScore = 0, opponentAlive = true;
+let gameSpeed,frameCount,obstacles,coins,particles,stars;
+let gameOver,started,onlineMode=false,offlineMode=false;
+let currentBiome,nextBiomeAt,biomeTransition,prevBiome;
+let lastObstacleFrame,lastCoinFrame;
+let bgLayers,clouds;
+let player1,player2;
+let opponentScore=0,opponentAlive=true;
+let opponentJumpQueue=[];
+let settings={baseSpeed:5,speedInc:0.0004,jumpForce:-13,gravity:0.6,showFps:false};
+let lastFrameTime=0,fpsDisplay=0;
 
-// Queued opponent jumps (frame-based)
-let opponentJumpQueue = [];
+function createPlayer(x,color,glow){return{x,y:0,w:36,h:36,vy:0,grounded:true,rotation:0,color,glow,score:0,alive:true};}
+function groundY(){return canvas.height-GROUND_OFFSET;}
 
-function createPlayer(x, color, glow) {
-  return { x, y:0, w:36, h:36, vy:0, grounded:true, rotation:0, color, glow, score:0, alive:true };
+function generateStars(){stars=[];for(let i=0;i<80;i++)stars.push({x:rng()*960,y:rng()*400,r:rng()*1.5+.3,twinkle:rng()*Math.PI*2});}
+function generateMountains(){
+  bgLayers=[];
+  let f=[];for(let x=0;x<1200;x+=80+rng()*60)f.push({x,h:60+rng()*50,w:100+rng()*80});
+  bgLayers.push({mountains:f,speed:.3,yOff:0});
+  let m=[];for(let x=0;x<1200;x+=60+rng()*50)m.push({x,h:40+rng()*40,w:70+rng()*60});
+  bgLayers.push({mountains:m,speed:.7,yOff:20});
+  let n=[];for(let x=0;x<1200;x+=40+rng()*40)n.push({x,h:20+rng()*30,w:30+rng()*30});
+  bgLayers.push({mountains:n,speed:1.2,yOff:35});
+}
+function generateClouds(){clouds=[];for(let i=0;i<6;i++)clouds.push({x:rng()*1000,y:30+rng()*120,w:60+rng()*100,h:15+rng()*20,speed:.15+rng()*.3});}
+function pickBiome(ex){const c=BIOMES.filter(b=>b!==ex);return c[Math.floor(rng()*(c.length))];}
+function lerpColor(a,b,t){const ah=parseInt(a.slice(1),16),bh=parseInt(b.slice(1),16);const ar=(ah>>16)&0xff,ag=(ah>>8)&0xff,ab=ah&0xff;const br=(bh>>16)&0xff,bg=(bh>>8)&0xff,bb=bh&0xff;return`#${(((Math.round(ar+(br-ar)*t))<<16)|((Math.round(ag+(bg-ag)*t))<<8)|(Math.round(ab+(bb-ab)*t))).toString(16).padStart(6,'0')}`;}
+function getBiomeColor(k){if(biomeTransition>0&&prevBiome)return lerpColor(prevBiome[k],currentBiome[k],1-biomeTransition/60);return currentBiome[k];}
+
+function initGame(seed){
+  settings=getSettings();
+  rng=seededRNG(seed||Date.now());
+  gameSpeed=settings.baseSpeed;frameCount=0;
+  obstacles=[];coins=[];particles=[];
+  gameOver=false;started=false;
+  lastObstacleFrame=-OBSTACLE_GAP;lastCoinFrame=-COIN_GAP;
+  currentBiome=BIOMES[0];prevBiome=null;biomeTransition=0;
+  nextBiomeAt=STAGE_DURATION+Math.floor(rng()*300);
+  opponentJumpQueue=[];opponentScore=0;opponentAlive=true;
+  player1=createPlayer(80,P1_COLOR,P1_GLOW);player1.y=groundY()-player1.h;
+  player2=null;
+  generateStars();generateMountains();generateClouds();
 }
 
-function groundY() { return canvas.height - GROUND_OFFSET; }
-
-function generateStars() {
-  stars = [];
-  for (let i = 0; i < 80; i++) stars.push({ x: rng()*960, y: rng()*400, r: rng()*1.5+0.3, twinkle: rng()*Math.PI*2 });
+function addPlayer2(){
+  if(player2)return;
+  player2=createPlayer(45,P2_COLOR,P2_GLOW);
+  player2.y=groundY()-player2.h;
 }
 
-function generateMountains() {
-  bgLayers = [];
-  const far = []; for (let x = 0; x < 1200; x += 80+rng()*60) far.push({ x, h:60+rng()*50, w:100+rng()*80 });
-  bgLayers.push({ mountains: far, speed: 0.3, yOff: 0 });
-  const mid = []; for (let x = 0; x < 1200; x += 60+rng()*50) mid.push({ x, h:40+rng()*40, w:70+rng()*60 });
-  bgLayers.push({ mountains: mid, speed: 0.7, yOff: 20 });
-  const near = []; for (let x = 0; x < 1200; x += 40+rng()*40) near.push({ x, h:20+rng()*30, w:30+rng()*30 });
-  bgLayers.push({ mountains: near, speed: 1.2, yOff: 35 });
+function addOpponentMidgame(){
+  addPlayer2();
 }
 
-function generateClouds() {
-  clouds = [];
-  for (let i = 0; i < 6; i++) clouds.push({ x:rng()*1000, y:30+rng()*120, w:60+rng()*100, h:15+rng()*20, speed:0.15+rng()*0.3 });
-}
-
-function pickRandomBiome(exclude) {
-  const idx = Math.floor(rng() * (BIOMES.length - 1));
-  const choices = BIOMES.filter(b => b !== exclude);
-  return choices[idx % choices.length];
-}
-
-function lerpColor(a, b, t) {
-  const ah = parseInt(a.slice(1),16), bh = parseInt(b.slice(1),16);
-  const ar=(ah>>16)&0xff, ag=(ah>>8)&0xff, ab=ah&0xff;
-  const br=(bh>>16)&0xff, bg=(bh>>8)&0xff, bb=bh&0xff;
-  const rr=Math.round(ar+(br-ar)*t), rg=Math.round(ag+(bg-ag)*t), rb=Math.round(ab+(bb-ab)*t);
-  return `#${((rr<<16)|(rg<<8)|rb).toString(16).padStart(6,'0')}`;
-}
-
-function getBiomeColor(key) {
-  if (biomeTransition > 0 && prevBiome) return lerpColor(prevBiome[key], currentBiome[key], 1 - biomeTransition/60);
-  return currentBiome[key];
-}
-
-function init(seed) {
-  rng = seededRNG(seed || Date.now());
-  gameSpeed = BASE_SPEED; frameCount = 0;
-  obstacles = []; coins = []; particles = [];
-  gameOver = false; started = false;
-  lastObstacleFrame = -OBSTACLE_GAP; lastCoinFrame = -COIN_GAP;
-  currentBiome = BIOMES[0]; prevBiome = null; biomeTransition = 0;
-  nextBiomeAt = STAGE_DURATION + Math.floor(rng()*300);
-  opponentJumpQueue = []; opponentScore = 0; opponentAlive = true;
-
-  player1 = createPlayer(80, P1_COLOR, P1_GLOW);
-  player1.y = groundY() - player1.h;
-  player2 = createPlayer(45, P2_COLOR, P2_GLOW);
-  player2.y = groundY() - player2.h;
-
-  generateStars(); generateMountains(); generateClouds();
+function allDead(){
+  if(!player1.alive) { if(!player2) return true; return !player2.alive; }
+  if(player2 && !player2.alive && !player1.alive) return true;
+  return false;
 }
 
 // ─── Input ───
-function myJump() {
-  const me = myPlayerIndex === 0 ? player1 : player2;
-  if (!me || !me.alive) return;
-  if (gameOver) {
-    send({ action: 'leave_room' });
-    currentRoomId = '';
-    onlineMode = false;
-    showScreen('lobby-screen');
-    canvas.style.display = 'none';
-    refreshRooms();
-    return;
-  }
-  if (!started) started = true;
-  if (me.grounded) {
-    me.vy = JUMP_FORCE; me.grounded = false;
-    send({ action: 'jump', frame: frameCount });
+function doJump(p){
+  if(!p||!p.alive)return;
+  if(!started)started=true;
+  if(p.grounded){p.vy=settings.jumpForce;p.grounded=false;}
+}
+
+function handleGameInput(){
+  if(gameOver){leaveCurrentGame();return;}
+  if(onlineMode){
+    const me=myPlayerIndex===0?player1:player2;
+    if(me&&me.alive&&me.grounded){
+      doJump(me);
+      send({action:'jump',frame:frameCount});
+    } else if(me&&me.alive&&!me.grounded){
+      if(!started)started=true;
+    } else if(me&&me.alive){
+      if(!started)started=true;
+    }
+  } else if(offlineMode){
+    doJump(player1);
   }
 }
 
-document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && onlineMode) { e.preventDefault(); myJump(); }
+function handleP2Input(){
+  if(offlineMode&&player2){doJump(player2);}
+}
+
+document.addEventListener('keydown',e=>{
+  if(canvas.style.display==='none')return;
+  if(e.code==='Space'){e.preventDefault();handleGameInput();}
+  if(e.code==='KeyW'){e.preventDefault();handleP2Input();}
+  if(e.code==='Escape'){e.preventDefault();if(gameOver||confirm('Leave game?'))leaveCurrentGame();}
 });
-canvas.addEventListener('click', () => { if (onlineMode) myJump(); });
-canvas.addEventListener('touchstart', e => { e.preventDefault(); if (onlineMode) myJump(); }, { passive: false });
+canvas.addEventListener('click',()=>handleGameInput());
+canvas.addEventListener('touchstart',e=>{e.preventDefault();handleGameInput();},{passive:false});
 
-function handleOpponentJump(frame) {
-  opponentJumpQueue.push(frame);
+// ─── Spawning ───
+function spawnObstacle(){
+  if(frameCount-lastObstacleFrame<OBSTACLE_GAP)return;
+  if(rng()>0.025)return;
+  const h=30+rng()*45,w=22+rng()*18;
+  obstacles.push({x:canvas.width+10,y:groundY()-h,w,h,scored:[]});
+  lastObstacleFrame=frameCount;
 }
-
-function handleOpponentDied(score, frame) {
-  const opp = myPlayerIndex === 0 ? player2 : player1;
-  if (opp) { opp.alive = false; opponentScore = score; opponentAlive = false; }
-  if (allDead()) gameOver = true;
+function spawnCoin(){
+  if(frameCount-lastCoinFrame<COIN_GAP)return;
+  if(rng()>0.018)return;
+  coins.push({x:canvas.width+10,y:groundY()-70-rng()*80,r:12,collected:false});
+  lastCoinFrame=frameCount;
 }
-
-function handleOpponentGameOver(score) {
-  opponentScore = score;
-}
-
-function allDead() { return !player1.alive && !player2.alive; }
-
-// ─── Spawning (deterministic via seeded RNG) ───
-function spawnObstacle() {
-  if (frameCount - lastObstacleFrame < OBSTACLE_GAP) return;
-  if (rng() > 0.025) return;
-  const h = 30 + rng()*45, w = 22 + rng()*18;
-  obstacles.push({ x: canvas.width+10, y: groundY()-h, w, h, scored: [] });
-  lastObstacleFrame = frameCount;
-}
-
-function spawnCoin() {
-  if (frameCount - lastCoinFrame < COIN_GAP) return;
-  if (rng() > 0.018) return;
-  coins.push({ x: canvas.width+10, y: groundY()-70-rng()*80, r:12, collected:false });
-  lastCoinFrame = frameCount;
-}
-
-function emitParticles(x, y, count, color) {
-  const cs = ['#00d2ff','#ff2e63','#ffd700','#7b2ff7'];
-  for (let i = 0; i < count; i++) {
-    particles.push({ x,y, vx:(Math.random()-0.5)*6, vy:(Math.random()-1)*5,
-      r:Math.random()*3+1, life:30+Math.random()*20, maxLife:50,
-      color: color || cs[Math.floor(Math.random()*cs.length)] });
-  }
-}
-
-function collides(a,b) { return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
-function collidesCircle(p,c) {
-  const cx=p.x+p.w/2, cy=p.y+p.h/2, dx=cx-c.x, dy=cy-c.y;
-  return Math.sqrt(dx*dx+dy*dy)<p.w/2+c.r;
-}
+function emitParticles(x,y,n,c){const cs=['#00d2ff','#ff2e63','#ffd700','#7b2ff7'];for(let i=0;i<n;i++)particles.push({x,y,vx:(Math.random()-.5)*6,vy:(Math.random()-1)*5,r:Math.random()*3+1,life:30+Math.random()*20,maxLife:50,color:c||cs[Math.floor(Math.random()*cs.length)]});}
+function collides(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
+function collidesCircle(p,c){const cx=p.x+p.w/2,cy=p.y+p.h/2,dx=cx-c.x,dy=cy-c.y;return Math.sqrt(dx*dx+dy*dy)<p.w/2+c.r;}
 
 // ─── Update ───
-function update() {
-  if (!started || gameOver) return;
+function update(){
+  if(!started||gameOver)return;
   frameCount++;
-  gameSpeed = BASE_SPEED + frameCount * SPEED_INCREMENT;
+  gameSpeed=settings.baseSpeed+frameCount*settings.speedInc;
 
-  if (biomeTransition > 0) biomeTransition--;
-  if (frameCount >= nextBiomeAt) {
-    prevBiome = currentBiome;
-    currentBiome = pickRandomBiome(currentBiome);
-    biomeTransition = 60;
-    nextBiomeAt = frameCount + STAGE_DURATION + Math.floor(rng()*400);
+  if(biomeTransition>0)biomeTransition--;
+  if(frameCount>=nextBiomeAt){prevBiome=currentBiome;currentBiome=pickBiome(currentBiome);biomeTransition=60;nextBiomeAt=frameCount+STAGE_DURATION+Math.floor(rng()*400);}
+
+  // Opponent jumps
+  if(onlineMode){
+    const opp=myPlayerIndex===0?player2:player1;
+    while(opponentJumpQueue.length>0){opponentJumpQueue.shift();if(opp&&opp.alive&&opp.grounded){opp.vy=settings.jumpForce;opp.grounded=false;}}
   }
 
-  // Process opponent jumps
-  const opp = myPlayerIndex === 0 ? player2 : player1;
-  while (opponentJumpQueue.length > 0) {
-    opponentJumpQueue.shift();
-    if (opp && opp.alive && opp.grounded) {
-      opp.vy = JUMP_FORCE; opp.grounded = false;
-    }
+  const players=[player1];if(player2)players.push(player2);
+  for(const p of players){
+    if(!p.alive)continue;
+    p.vy+=settings.gravity;p.y+=p.vy;
+    if(p.y>=groundY()-p.h){p.y=groundY()-p.h;p.vy=0;p.grounded=true;}
+    if(!p.grounded)p.rotation+=.08;else p.rotation=0;
   }
 
-  // Physics for both players
-  for (const p of [player1, player2]) {
-    if (!p || !p.alive) continue;
-    p.vy += GRAVITY; p.y += p.vy;
-    if (p.y >= groundY()-p.h) { p.y=groundY()-p.h; p.vy=0; p.grounded=true; }
-    if (!p.grounded) p.rotation += 0.08; else p.rotation = 0;
-  }
-
-  // Obstacles (deterministic spawning)
   spawnObstacle();
-  const me = myPlayerIndex === 0 ? player1 : player2;
-  for (let i = obstacles.length-1; i >= 0; i--) {
-    const o = obstacles[i];
-    o.x -= gameSpeed;
-    for (const p of [player1, player2]) {
-      if (p && p.alive && !o.scored.includes(p) && o.x+o.w < p.x) { o.scored.push(p); p.score++; }
-    }
-    if (o.x+o.w < -10) { obstacles.splice(i,1); continue; }
-    for (const p of [player1, player2]) {
-      if (p && p.alive && collides(p, o)) {
-        p.alive = false;
-        emitParticles(p.x+p.w/2, p.y+p.h/2, 30, p.color);
-        if (p === me) {
-          send({ action: 'player_died', score: me.score, frame: frameCount });
-        }
+  const me=onlineMode?(myPlayerIndex===0?player1:player2):player1;
+  for(let i=obstacles.length-1;i>=0;i--){
+    const o=obstacles[i];o.x-=gameSpeed;
+    for(const p of players){if(p.alive&&!o.scored.includes(p)&&o.x+o.w<p.x){o.scored.push(p);p.score++;}}
+    if(o.x+o.w<-10){obstacles.splice(i,1);continue;}
+    for(const p of players){
+      if(p.alive&&collides(p,o)){
+        p.alive=false;emitParticles(p.x+p.w/2,p.y+p.h/2,30,p.color);
+        if(onlineMode&&p===me)send({action:'player_died',score:me.score,frame:frameCount});
       }
     }
   }
-  if (allDead()) gameOver = true;
+  // Check game over
+  const anyAlive=players.some(p=>p.alive);
+  if(!anyAlive)gameOver=true;
 
-  // Coins
   spawnCoin();
-  for (let i = coins.length-1; i >= 0; i--) {
-    const c = coins[i];
-    c.x -= gameSpeed;
-    if (c.x+c.r < -10) { coins.splice(i,1); continue; }
-    if (!c.collected) {
-      for (const p of [player1, player2]) {
-        if (p && p.alive && collidesCircle(p,c)) {
-          c.collected = true; p.score += 3;
-          emitParticles(c.x, c.y, 12, '#ffd700');
-          coins.splice(i,1); break;
-        }
-      }
-    }
+  for(let i=coins.length-1;i>=0;i--){
+    const c=coins[i];c.x-=gameSpeed;
+    if(c.x+c.r<-10){coins.splice(i,1);continue;}
+    if(!c.collected){for(const p of players){if(p.alive&&collidesCircle(p,c)){c.collected=true;p.score+=3;emitParticles(c.x,c.y,12,'#ffd700');coins.splice(i,1);break;}}}
   }
 
-  // Particles
-  for (let i = particles.length-1; i >= 0; i--) {
-    const p = particles[i];
-    p.x+=p.vx; p.y+=p.vy; p.vy+=0.1; p.life--;
-    if (p.life<=0) particles.splice(i,1);
-  }
-
-  // Parallax
-  for (const layer of bgLayers) {
-    for (const m of layer.mountains) { m.x -= gameSpeed*layer.speed; if (m.x+m.w < -20) m.x += 1200+m.w; }
-  }
-  for (const c of clouds) { c.x -= gameSpeed*c.speed; if (c.x+c.w < -20) { c.x=canvas.width+20+Math.random()*100; c.y=30+Math.random()*120; } }
+  for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.1;p.life--;if(p.life<=0)particles.splice(i,1);}
+  for(const l of bgLayers)for(const m of l.mountains){m.x-=gameSpeed*l.speed;if(m.x+m.w<-20)m.x+=1200+m.w;}
+  for(const c of clouds){c.x-=gameSpeed*c.speed;if(c.x+c.w<-20){c.x=canvas.width+20+Math.random()*100;c.y=30+Math.random()*120;}}
 }
 
 // ─── Drawing ───
-function drawBackground() {
-  const grad = ctx.createLinearGradient(0,0,0,canvas.height);
-  grad.addColorStop(0, getBiomeColor('sky1'));
-  grad.addColorStop(0.5, getBiomeColor('sky2'));
-  grad.addColorStop(1, getBiomeColor('sky3'));
-  ctx.fillStyle = grad; ctx.fillRect(0,0,canvas.width,canvas.height);
-  for (const s of stars) {
-    s.twinkle += 0.02;
-    ctx.fillStyle = `rgba(255,255,255,${0.4+Math.sin(s.twinkle)*0.3})`;
-    ctx.beginPath(); ctx.arc(s.x*(canvas.width/960), s.y*(canvas.height/520), s.r, 0, Math.PI*2); ctx.fill();
-  }
-  const cCol = currentBiome.cloudColor || 'rgba(255,255,255,0.06)';
-  for (const c of clouds) {
-    ctx.fillStyle = cCol;
-    ctx.beginPath(); ctx.ellipse(c.x+c.w/2, c.y+c.h/2, c.w/2, c.h/2, 0, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(c.x+c.w*0.3, c.y+c.h*0.3, c.w*0.35, c.h*0.4, 0, 0, Math.PI*2); ctx.fill();
-  }
+function drawBg(){
+  const g=ctx.createLinearGradient(0,0,0,canvas.height);
+  g.addColorStop(0,getBiomeColor('sky1'));g.addColorStop(.5,getBiomeColor('sky2'));g.addColorStop(1,getBiomeColor('sky3'));
+  ctx.fillStyle=g;ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(const s of stars){s.twinkle+=.02;ctx.fillStyle=`rgba(255,255,255,${.4+Math.sin(s.twinkle)*.3})`;ctx.beginPath();ctx.arc(s.x*(canvas.width/960),s.y*(canvas.height/520),s.r,0,Math.PI*2);ctx.fill();}
+  const cc=currentBiome.cloudColor||'rgba(255,255,255,.06)';
+  for(const c of clouds){ctx.fillStyle=cc;ctx.beginPath();ctx.ellipse(c.x+c.w/2,c.y+c.h/2,c.w/2,c.h/2,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(c.x+c.w*.3,c.y+c.h*.3,c.w*.35,c.h*.4,0,0,Math.PI*2);ctx.fill();}
 }
-
-function drawMountains() {
-  const gY = groundY(), keys = ['mountainFar','mountainMid','mountain'];
-  for (let li = 0; li < bgLayers.length; li++) {
-    ctx.fillStyle = getBiomeColor(keys[li]||'mountain');
-    for (const m of bgLayers[li].mountains) {
-      ctx.beginPath(); ctx.moveTo(m.x, gY-bgLayers[li].yOff);
-      ctx.lineTo(m.x+m.w/2, gY-bgLayers[li].yOff-m.h);
-      ctx.lineTo(m.x+m.w, gY-bgLayers[li].yOff); ctx.closePath(); ctx.fill();
-    }
-  }
+function drawMountains(){
+  const gY=groundY(),keys=['mountainFar','mountainMid','mountain'];
+  for(let i=0;i<bgLayers.length;i++){ctx.fillStyle=getBiomeColor(keys[i]);for(const m of bgLayers[i].mountains){ctx.beginPath();ctx.moveTo(m.x,gY-bgLayers[i].yOff);ctx.lineTo(m.x+m.w/2,gY-bgLayers[i].yOff-m.h);ctx.lineTo(m.x+m.w,gY-bgLayers[i].yOff);ctx.closePath();ctx.fill();}}
 }
-
-function drawGrid() {
-  ctx.strokeStyle = currentBiome.gridColor||'rgba(0,210,255,0.06)'; ctx.lineWidth=1;
-  const gs=50, off=started?(frameCount*gameSpeed)%gs:0;
+function drawGrid(){
+  ctx.strokeStyle=currentBiome.gridColor;ctx.lineWidth=1;const gs=50,off=started?(frameCount*gameSpeed)%gs:0;
   for(let x=-off;x<canvas.width;x+=gs){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,groundY());ctx.stroke();}
   for(let y=0;y<groundY();y+=gs){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
 }
-
-function drawGround() {
-  ctx.fillStyle = getBiomeColor('ground'); ctx.fillRect(0,groundY(),canvas.width,GROUND_OFFSET);
-  const gl = getBiomeColor('groundLine');
-  ctx.strokeStyle=gl; ctx.lineWidth=2; ctx.shadowColor=gl; ctx.shadowBlur=10;
-  ctx.beginPath(); ctx.moveTo(0,groundY()); ctx.lineTo(canvas.width,groundY()); ctx.stroke(); ctx.shadowBlur=0;
-  ctx.globalAlpha=0.3; ctx.lineWidth=1;
-  const d=started?(frameCount*gameSpeed*1.5)%30:0;
+function drawGround(){
+  ctx.fillStyle=getBiomeColor('ground');ctx.fillRect(0,groundY(),canvas.width,GROUND_OFFSET);
+  const gl=getBiomeColor('groundLine');ctx.strokeStyle=gl;ctx.lineWidth=2;ctx.shadowColor=gl;ctx.shadowBlur=10;
+  ctx.beginPath();ctx.moveTo(0,groundY());ctx.lineTo(canvas.width,groundY());ctx.stroke();ctx.shadowBlur=0;
+  ctx.globalAlpha=.3;ctx.lineWidth=1;const d=started?(frameCount*gameSpeed*1.5)%30:0;
   for(let x=-d;x<canvas.width;x+=30){ctx.beginPath();ctx.moveTo(x,groundY()+15);ctx.lineTo(x+12,groundY()+15);ctx.stroke();}
   ctx.globalAlpha=1;
 }
-
-function drawPlayerChar(p) {
-  if (!p||!p.alive) return;
-  ctx.save();
-  const cx=p.x+p.w/2, cy=p.y+p.h/2;
-  ctx.translate(cx,cy); ctx.rotate(p.rotation);
-  ctx.shadowColor=p.glow; ctx.shadowBlur=18; ctx.fillStyle=p.color;
-  const r=6, hw=p.w/2, hh=p.h/2;
-  ctx.beginPath();
-  ctx.moveTo(-hw+r,-hh); ctx.lineTo(hw-r,-hh); ctx.quadraticCurveTo(hw,-hh,hw,-hh+r);
-  ctx.lineTo(hw,hh-r); ctx.quadraticCurveTo(hw,hh,hw-r,hh);
-  ctx.lineTo(-hw+r,hh); ctx.quadraticCurveTo(-hw,hh,-hw,hh-r);
-  ctx.lineTo(-hw,-hh+r); ctx.quadraticCurveTo(-hw,-hh,-hw+r,-hh);
-  ctx.closePath(); ctx.fill();
-  ctx.shadowBlur=0;
-  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(6,-4,5,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#0a0a1a'; ctx.beginPath(); ctx.arc(7,-4,2.5,0,Math.PI*2); ctx.fill();
+function drawChar(p){
+  if(!p||!p.alive)return;ctx.save();const cx=p.x+p.w/2,cy=p.y+p.h/2;
+  ctx.translate(cx,cy);ctx.rotate(p.rotation);ctx.shadowColor=p.glow;ctx.shadowBlur=18;ctx.fillStyle=p.color;
+  const r=6,hw=p.w/2,hh=p.h/2;ctx.beginPath();ctx.moveTo(-hw+r,-hh);ctx.lineTo(hw-r,-hh);ctx.quadraticCurveTo(hw,-hh,hw,-hh+r);ctx.lineTo(hw,hh-r);ctx.quadraticCurveTo(hw,hh,hw-r,hh);ctx.lineTo(-hw+r,hh);ctx.quadraticCurveTo(-hw,hh,-hw,hh-r);ctx.lineTo(-hw,-hh+r);ctx.quadraticCurveTo(-hw,-hh,-hw+r,-hh);ctx.closePath();ctx.fill();
+  ctx.shadowBlur=0;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(6,-4,5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#0a0a1a';ctx.beginPath();ctx.arc(7,-4,2.5,0,Math.PI*2);ctx.fill();
   ctx.restore();
   // Name tag
-  ctx.fillStyle = p.color; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-  const name = (p === player1 && myPlayerIndex === 0) || (p === player2 && myPlayerIndex === 1)
-    ? myUsername : opponentUsername;
-  ctx.fillText(name, p.x+p.w/2, p.y - 8);
+  ctx.fillStyle=p.color;ctx.font='10px sans-serif';ctx.textAlign='center';
+  let name='';
+  if(onlineMode){name=(p===player1&&myPlayerIndex===0)||(p===player2&&myPlayerIndex===1)?myUsername:opponentUsername;}
+  else{name=p===player1?'P1':(player2?'P2':'');}
+  if(name)ctx.fillText(name,p.x+p.w/2,p.y-8);
 }
-
-function drawGhost(p) {
-  if (!p||p.alive) return;
-  ctx.save(); ctx.globalAlpha=0.2;
-  ctx.fillStyle=p.color; ctx.fillRect(p.x, p.y, p.w, p.h);
-  ctx.restore();
-  ctx.fillStyle='#ff2e63'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
-  ctx.fillText('X', p.x+p.w/2, p.y+p.h/2+4);
+function drawGhost(p){
+  if(!p||p.alive)return;ctx.save();ctx.globalAlpha=.2;ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,p.w,p.h);ctx.restore();
+  ctx.fillStyle='#ff2e63';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.fillText('X',p.x+p.w/2,p.y+p.h/2+4);
 }
+function drawObstacles(){for(const o of obstacles){ctx.fillStyle=getBiomeColor('obstacleDark');ctx.fillRect(o.x+3,o.y+3,o.w,o.h);ctx.fillStyle=getBiomeColor('obstacle');ctx.shadowColor=getBiomeColor('obstacle');ctx.shadowBlur=8;ctx.fillRect(o.x,o.y,o.w,o.h);ctx.shadowBlur=0;ctx.fillStyle=getBiomeColor('obstacleTop');ctx.fillRect(o.x,o.y,o.w,4);}}
+function drawCoins(){const bob=Math.sin(frameCount*.08)*4;for(const c of coins){if(c.collected)continue;ctx.save();ctx.translate(c.x,c.y+bob);ctx.shadowColor='rgba(255,215,0,.35)';ctx.shadowBlur=14;ctx.fillStyle='#ffd700';ctx.beginPath();ctx.arc(0,0,c.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='#b8960a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,c.r-4,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#b8960a';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('$',0,1);ctx.restore();}}
+function drawParticles(){for(const p of particles){ctx.globalAlpha=p.life/p.maxLife;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;}
 
-function drawObstacles() {
-  for(const o of obstacles){
-    ctx.fillStyle=getBiomeColor('obstacleDark'); ctx.fillRect(o.x+3,o.y+3,o.w,o.h);
-    ctx.fillStyle=getBiomeColor('obstacle'); ctx.shadowColor=getBiomeColor('obstacle'); ctx.shadowBlur=8;
-    ctx.fillRect(o.x,o.y,o.w,o.h); ctx.shadowBlur=0;
-    ctx.fillStyle=getBiomeColor('obstacleTop'); ctx.fillRect(o.x,o.y,o.w,4);
-  }
-}
-
-function drawCoins() {
-  const bob=Math.sin(frameCount*0.08)*4;
-  for(const c of coins){
-    if(c.collected) continue; ctx.save(); ctx.translate(c.x,c.y+bob);
-    ctx.shadowColor='rgba(255,215,0,0.35)'; ctx.shadowBlur=14; ctx.fillStyle='#ffd700';
-    ctx.beginPath(); ctx.arc(0,0,c.r,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
-    ctx.strokeStyle='#b8960a'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,c.r-4,0,Math.PI*2); ctx.stroke();
-    ctx.fillStyle='#b8960a'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText('$',0,1); ctx.restore();
-  }
-}
-
-function drawParticles() {
-  for(const p of particles){ctx.globalAlpha=p.life/p.maxLife;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();}
-  ctx.globalAlpha=1;
-}
-
-function drawHUD() {
-  const me = myPlayerIndex === 0 ? player1 : player2;
-  const opp = myPlayerIndex === 0 ? player2 : player1;
+function drawHUD(){
   ctx.textAlign='left';
-  ctx.fillStyle=me.color; ctx.font='bold 18px "Segoe UI",sans-serif';
-  ctx.fillText(`You: ${me.score}`, 20, 28);
-  if(!me.alive){ctx.fillStyle='#ff2e63';ctx.font='12px sans-serif';ctx.fillText('DEAD',20,44);}
-  ctx.fillStyle=opp.color; ctx.font='bold 18px "Segoe UI",sans-serif';
-  ctx.fillText(`${opponentUsername}: ${opp.alive ? opp.score : opponentScore}`, 140, 28);
-  if(!opp.alive){ctx.fillStyle='#ff2e63';ctx.font='12px sans-serif';ctx.fillText('DEAD',140,44);}
-  ctx.textAlign='right'; ctx.font='13px sans-serif'; ctx.fillStyle=getBiomeColor('accent');
-  ctx.fillText(`Speed: ${gameSpeed.toFixed(1)}`, canvas.width-20, 28);
-  ctx.fillStyle='#888'; ctx.font='11px sans-serif'; ctx.fillText(currentBiome.name, canvas.width-20, 44);
+  ctx.fillStyle=player1.color;ctx.font='bold 18px "Segoe UI",sans-serif';
+  if(onlineMode){
+    const me=myPlayerIndex===0?player1:player2;
+    const opp=myPlayerIndex===0?player2:player1;
+    ctx.fillStyle=me?me.color:'#fff';ctx.fillText(`You: ${me?me.score:0}`,20,28);
+    if(me&&!me.alive){ctx.fillStyle='#ff2e63';ctx.font='12px sans-serif';ctx.fillText('DEAD',20,44);}
+    if(opp){ctx.fillStyle=opp.color;ctx.font='bold 18px "Segoe UI",sans-serif';ctx.fillText(`${opponentUsername||'P2'}: ${opp.alive?opp.score:opponentScore}`,140,28);
+      if(!opp.alive){ctx.fillStyle='#ff2e63';ctx.font='12px sans-serif';ctx.fillText('DEAD',140,44);}}
+    else{ctx.fillStyle='#555';ctx.font='13px sans-serif';ctx.fillText('Waiting for opponent...',140,28);}
+  } else {
+    ctx.fillText(`P1: ${player1.score}`,20,28);
+    if(!player1.alive){ctx.fillStyle='#ff2e63';ctx.font='12px sans-serif';ctx.fillText('DEAD',20,44);}
+    if(player2){ctx.fillStyle=player2.color;ctx.font='bold 18px "Segoe UI",sans-serif';ctx.fillText(`P2: ${player2.score}`,120,28);
+      if(!player2.alive){ctx.fillStyle='#ff2e63';ctx.font='12px sans-serif';ctx.fillText('DEAD',120,44);}}
+  }
+  ctx.textAlign='right';ctx.font='13px sans-serif';ctx.fillStyle=getBiomeColor('accent');
+  ctx.fillText(`Speed: ${gameSpeed.toFixed(1)}`,canvas.width-20,28);
+  ctx.fillStyle='#888';ctx.font='11px sans-serif';ctx.fillText(currentBiome.name,canvas.width-20,44);
+  if(onlineMode&&currentRoomId){ctx.fillText('Room: '+currentRoomId,canvas.width-20,58);}
+  if(settings.showFps){ctx.fillStyle='#39ff14';ctx.font='11px monospace';ctx.fillText('FPS: '+fpsDisplay,canvas.width-20,72);}
 }
 
-function drawStartScreen() {
-  ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='#00d2ff'; ctx.font='bold 36px "Segoe UI",sans-serif'; ctx.textAlign='center';
-  ctx.fillText('READY?', canvas.width/2, canvas.height/2-20);
-  ctx.fillStyle='#fff'; ctx.font='18px "Segoe UI",sans-serif';
-  ctx.fillText('Press SPACE or tap to start', canvas.width/2, canvas.height/2+20);
+function drawStartScreen(){
+  ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#00d2ff';ctx.font='bold 36px "Segoe UI",sans-serif';ctx.textAlign='center';
+  ctx.fillText('READY?',canvas.width/2,canvas.height/2-20);
+  ctx.fillStyle='#fff';ctx.font='18px "Segoe UI",sans-serif';
+  ctx.fillText('Press SPACE or tap to start',canvas.width/2,canvas.height/2+20);
+  ctx.fillStyle='#666';ctx.font='13px sans-serif';
+  ctx.fillText('ESC = back to menu',canvas.width/2,canvas.height/2+50);
 }
 
-function drawGameOver() {
-  ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='#ff2e63'; ctx.font='bold 44px "Segoe UI",sans-serif'; ctx.textAlign='center';
-  ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2-50);
-  const me = myPlayerIndex === 0 ? player1 : player2;
-  const opp = myPlayerIndex === 0 ? player2 : player1;
-  const oppScore = opp.alive ? opp.score : opponentScore;
-  ctx.font='22px "Segoe UI",sans-serif';
-  ctx.fillStyle=me.color; ctx.fillText(`You: ${me.score}`, canvas.width/2, canvas.height/2-10);
-  ctx.fillStyle=opp.color; ctx.fillText(`${opponentUsername}: ${oppScore}`, canvas.width/2, canvas.height/2+20);
-  ctx.font='bold 18px "Segoe UI",sans-serif';
-  if(me.score > oppScore){ctx.fillStyle='#39ff14';ctx.fillText('YOU WIN!', canvas.width/2, canvas.height/2+55);}
-  else if(me.score < oppScore){ctx.fillStyle='#ff2e63';ctx.fillText('YOU LOSE', canvas.width/2, canvas.height/2+55);}
-  else{ctx.fillStyle='#ffd700';ctx.fillText('TIE!', canvas.width/2, canvas.height/2+55);}
-  // Back to lobby button
-  const bw=200, bh=46, bx=canvas.width/2-bw/2, by=canvas.height/2+75;
-  ctx.fillStyle=getBiomeColor('accent');
-  ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,10); ctx.fill();
-  ctx.fillStyle='#0a0a1a'; ctx.font='bold 18px "Segoe UI",sans-serif';
-  ctx.fillText('BACK TO LOBBY', canvas.width/2, by+bh/2+6);
+function drawGameOver(){
+  ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#ff2e63';ctx.font='bold 44px "Segoe UI",sans-serif';ctx.textAlign='center';
+  ctx.fillText('GAME OVER',canvas.width/2,canvas.height/2-60);
+  if(onlineMode){
+    const me=myPlayerIndex===0?player1:player2;
+    const opp=myPlayerIndex===0?player2:player1;
+    const os=opp?(opp.alive?opp.score:opponentScore):0;
+    ctx.font='22px "Segoe UI",sans-serif';
+    ctx.fillStyle=me?me.color:'#fff';ctx.fillText(`You: ${me?me.score:0}`,canvas.width/2,canvas.height/2-20);
+    if(opp){ctx.fillStyle=opp.color;ctx.fillText(`${opponentUsername}: ${os}`,canvas.width/2,canvas.height/2+10);}
+    ctx.font='bold 18px "Segoe UI",sans-serif';
+    const ms=me?me.score:0;
+    if(opp){if(ms>os){ctx.fillStyle='#39ff14';ctx.fillText('YOU WIN!',canvas.width/2,canvas.height/2+42);}
+    else if(ms<os){ctx.fillStyle='#ff2e63';ctx.fillText('YOU LOSE',canvas.width/2,canvas.height/2+42);}
+    else{ctx.fillStyle='#ffd700';ctx.fillText('TIE!',canvas.width/2,canvas.height/2+42);}}
+    else{ctx.fillStyle='#aaa';ctx.fillText('Solo run',canvas.width/2,canvas.height/2+42);}
+  } else {
+    ctx.font='22px "Segoe UI",sans-serif';ctx.fillStyle=P1_COLOR;
+    ctx.fillText(`P1: ${player1.score}`,canvas.width/2,canvas.height/2-20);
+    if(player2){ctx.fillStyle=P2_COLOR;ctx.fillText(`P2: ${player2.score}`,canvas.width/2,canvas.height/2+10);
+      ctx.font='bold 18px "Segoe UI",sans-serif';
+      if(player1.score>player2.score){ctx.fillStyle=P1_COLOR;ctx.fillText('P1 Wins!',canvas.width/2,canvas.height/2+42);}
+      else if(player2.score>player1.score){ctx.fillStyle=P2_COLOR;ctx.fillText('P2 Wins!',canvas.width/2,canvas.height/2+42);}
+      else{ctx.fillStyle='#ffd700';ctx.fillText('TIE!',canvas.width/2,canvas.height/2+42);}}
+  }
+  // Menu button
+  const bw=220,bh=44,bx=canvas.width/2-bw/2,by=canvas.height/2+65;
+  ctx.fillStyle=getBiomeColor('accent');ctx.beginPath();ctx.roundRect(bx,by,bw,bh,10);ctx.fill();
+  ctx.fillStyle='#0a0a1a';ctx.font='bold 17px "Segoe UI",sans-serif';ctx.fillText('BACK TO MENU',canvas.width/2,by+bh/2+6);
 }
 
-function loop() {
-  if (!onlineMode) return;
+// ─── Loop ───
+let loopActive=false;
+function loop(ts){
+  if(!loopActive)return;
+  if(settings.showFps&&ts){const dt=ts-lastFrameTime;lastFrameTime=ts;if(dt>0)fpsDisplay=Math.round(1000/dt);}
   update();
-  drawBackground(); drawMountains(); drawGrid(); drawGround();
-  drawObstacles(); drawCoins();
-  drawGhost(player1); drawGhost(player2);
-  drawPlayerChar(player1); drawPlayerChar(player2);
+  drawBg();drawMountains();drawGrid();drawGround();drawObstacles();drawCoins();
+  drawGhost(player1);if(player2)drawGhost(player2);
+  drawChar(player1);if(player2)drawChar(player2);
   drawParticles();
-  if (started && !gameOver) drawHUD();
-  if (!started) drawStartScreen();
-  if (gameOver) { drawHUD(); drawGameOver(); }
+  if(started&&!gameOver)drawHUD();
+  if(!started)drawStartScreen();
+  if(gameOver){drawHUD();drawGameOver();}
   requestAnimationFrame(loop);
 }
 
-function startOnlineGame() {
-  onlineMode = true;
-  showScreen('game-screen');
-  canvas.style.display = 'block';
-  init(gameSeed);
-  if (!gameLoopRunning) { gameLoopRunning = true; }
-  loop();
+function startOnlineGame(solo){
+  onlineMode=true;offlineMode=false;
+  showScreen('game-active');canvas.style.display='block';
+  initGame(gameSeed);
+  if(!solo)addPlayer2();
+  loopActive=true;loop();
+}
+
+function startOffline(){
+  onlineMode=false;offlineMode=true;
+  showScreen('game-active');canvas.style.display='block';
+  initGame(Date.now());
+  // Offline: add P2 so the W key works
+  addPlayer2();
+  loopActive=true;loop();
 }
 </script>
 </body>
