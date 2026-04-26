@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cube Clash: Solo Arena</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --accent: #ffd84d;
+      --bad: #ff5566;
+      --good: #66ff99;
+      --panel: rgba(8, 12, 28, 0.55);
+      --panel-border: rgba(255, 255, 255, 0.18);
+      --text: #f4f7ff;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #0a0e1c;
+      color: var(--text);
+      font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+      user-select: none;
+    }
+    #game-canvas { display: block; width: 100vw; height: 100vh; }
+
+    .hud {
+      position: absolute;
+      pointer-events: none;
+      padding: 10px 14px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    #timer {
+      top: 16px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 28px;
+      min-width: 110px;
+      text-align: center;
+      color: var(--accent);
+      text-shadow: 0 0 10px rgba(255, 216, 77, 0.5);
+    }
+    #scoreboard {
+      top: 16px; left: 16px;
+      min-width: 220px;
+      font-size: 14px;
+    }
+    #scoreboard h3 {
+      margin: 0 0 6px 0;
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    #scoreboard ol {
+      margin: 0; padding: 0;
+      list-style: none;
+    }
+    #scoreboard li {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.08);
+    }
+    #scoreboard li.you { color: var(--good); }
+    #scoreboard .swatch {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 2px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    #player-stats {
+      bottom: 16px; right: 16px;
+      min-width: 220px;
+      text-align: right;
+      font-size: 16px;
+    }
+    #player-stats .row {
+      display: flex; justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    #player-stats .label {
+      color: rgba(255,255,255,0.6);
+      font-size: 12px; letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    #player-stats .value { font-size: 22px; }
+    #hp-bar-outer {
+      width: 100%; height: 10px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 5px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    #hp-bar-inner {
+      height: 100%;
+      background: linear-gradient(90deg, var(--good), var(--accent));
+      width: 100%;
+      transition: width 0.15s ease-out;
+    }
+
+    #controls-hint {
+      bottom: 16px; left: 16px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.7);
+      max-width: 260px;
+      line-height: 1.5;
+    }
+    #controls-hint kbd {
+      display: inline-block;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: inherit;
+      font-size: 11px;
+    }
+
+    .crosshair {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 18px; height: 18px;
+      margin-left: -9px; margin-top: -9px;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+    .crosshair::before, .crosshair::after {
+      content: ''; position: absolute;
+      background: var(--accent);
+    }
+    .crosshair::before {
+      left: 50%; top: 0; bottom: 0;
+      width: 2px; margin-left: -1px;
+    }
+    .crosshair::after {
+      top: 50%; left: 0; right: 0;
+      height: 2px; margin-top: -1px;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(4px);
+      z-index: 10;
+    }
+    .overlay.hidden { display: none; }
+    .panel {
+      background: linear-gradient(180deg, rgba(20,28,52,0.92), rgba(8,12,28,0.92));
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 36px 44px;
+      text-align: center;
+      box-shadow: 0 10px 60px rgba(0,0,0,0.5);
+      max-width: 440px;
+    }
+    .panel h1 {
+      margin: 0 0 12px 0;
+      font-size: 36px;
+      color: var(--accent);
+      letter-spacing: 1px;
+    }
+    .panel p { line-height: 1.6; margin: 8px 0; }
+    .panel .stat-row {
+      display: flex; justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.1);
+    }
+    .panel .stat-row .label { color: rgba(255,255,255,0.6); }
+    .btn {
+      display: inline-block;
+      margin-top: 18px;
+      padding: 12px 28px;
+      background: var(--accent);
+      color: #1a1a1a;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(255,216,77,0.35);
+    }
+
+    #pointer-lock-hint {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, 60px);
+      padding: 8px 14px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.75);
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    #pointer-lock-hint.hidden { opacity: 0; }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+
+  <!--
+    Why plain <script> tags rather than <script type="module" src="...">?
+    Browsers (Chrome / Edge) refuse to fetch ES-module sources over the
+    `file://` scheme due to CORS, which would force the user to run a
+    local web server just to open the game. The IIFE pattern keeps the
+    Clean Architecture layer boundaries (entities -> use cases -> adapters)
+    while still working when the file is opened with a double-click.
+    The single inline <script type="module"> at the bottom imports
+    Three.js from the importmap (HTTPS, so it loads fine) and hands it
+    off to the rest of the code as `window.THREE`.
+  -->
+  <script src="./entities.js"></script>
+  <script src="./interfaces.js"></script>
+  <script src="./usecases.js"></script>
+  <script src="./adapters.js"></script>
+  <script src="./main.js"></script>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <div id="timer" class="hud">3:00</div>
+
+  <div id="scoreboard" class="hud">
+    <h3>Leaderboard</h3>
+    <ol id="scoreboard-list"></ol>
+  </div>
+
+  <div id="player-stats" class="hud">
+    <div class="row"><span class="label">Score</span><span class="value" id="score-value">0</span></div>
+    <div class="row"><span class="label">Health</span><span class="value" id="hp-value">100</span></div>
+    <div id="hp-bar-outer"><div id="hp-bar-inner"></div></div>
+  </div>
+
+  <div id="controls-hint" class="hud">
+    <kbd>WASD</kbd> move &nbsp; <kbd>Space</kbd> jump<br/>
+    <kbd>Mouse</kbd> aim &nbsp; <kbd>LMB</kbd> shoot<br/>
+    <kbd>Esc</kbd> release mouse
+  </div>
+
+  <div class="crosshair"></div>
+
+  <div id="pointer-lock-hint">Click to lock cursor and play</div>
+
+  <div id="match-over" class="overlay hidden">
+    <div class="panel">
+      <h1>Match Over</h1>
+      <div class="stat-row"><span class="label">Final Score</span><span id="final-score">0</span></div>
+      <div class="stat-row"><span class="label">Bots Eliminated</span><span id="final-kills">0</span></div>
+      <div class="stat-row"><span class="label">Hits Landed</span><span id="final-hits">0</span></div>
+      <div class="stat-row"><span class="label">Deaths</span><span id="final-deaths">0</span></div>
+      <button class="btn" id="play-again">Play Again</button>
+    </div>
+  </div>
+
+  <!--
+    Bootstrap: import Three.js from the CDN via the importmap above and
+    call CubeClash.boot(). Inline modules don't suffer the file:// CORS
+    restriction that blocks `<script type="module" src=>`.
+  -->
+  <script type="module">
+    import * as THREE from 'three';
+    window.THREE = THREE;
+    if (window.CubeClash && typeof window.CubeClash.boot === 'function') {
+      window.CubeClash.boot();
+    } else {
+      console.error('CubeClash.boot not found - did the script tags load?');
+    }
+  </script>
+</body>
+</html>
