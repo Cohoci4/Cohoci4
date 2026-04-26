@@ -108,7 +108,8 @@ export class Game {
 
   _gameLoop(time) {
     if (!this.running) return;
-    const dt = Math.min((time - this.lastTime) / 1000, 0.05);
+    const rawDt = (time - this.lastTime) / 1000;
+    const dt = Math.min(Math.max(rawDt, 0), 0.05);
     this.lastTime = time;
 
     if (!this.paused && this.alive) {
@@ -143,7 +144,7 @@ export class Game {
 
     const effectiveSpeed = this.overdriveActive ? this.speed * OVERDRIVE_MULTIPLIER : this.speed;
     this.distance += effectiveSpeed * dt;
-    this.score += Math.floor(effectiveSpeed * dt);
+    this.score += Math.max(0, Math.floor(effectiveSpeed * dt));
 
     // Overdrive timer
     if (this.overdriveActive) {
