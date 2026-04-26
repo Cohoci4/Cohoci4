@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>NEON RUN — Cyberpunk Runner</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --cyan: #00f0ff;
+      --magenta: #ff00ff;
+      --purple: #aa00ff;
+      --yellow: #ffff00;
+      --dark-bg: #0a0a2e;
+      --panel-bg: rgba(10, 10, 46, 0.85);
+    }
+
+    body {
+      background: var(--dark-bg);
+      color: #fff;
+      font-family: 'Share Tech Mono', monospace;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      cursor: crosshair;
+    }
+
+    #game-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+    }
+
+    /* ═══ MAIN MENU ═══════════════════════════════════════════ */
+    #main-menu {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--dark-bg);
+      transition: opacity 0.5s, transform 0.5s;
+    }
+
+    #main-menu.hidden {
+      opacity: 0;
+      transform: scale(1.1);
+      pointer-events: none;
+    }
+
+    #menu-bg-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+    }
+
+    .menu-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+    }
+
+    .menu-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(2rem, 8vw, 5rem);
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--cyan), var(--magenta), var(--purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.3em;
+      animation: glitch-title 3s infinite;
+    }
+
+    .menu-subtitle {
+      font-size: clamp(0.8rem, 2vw, 1.2rem);
+      color: var(--cyan);
+      opacity: 0.7;
+      margin-bottom: 2em;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+    }
+
+    .menu-input-group {
+      margin-bottom: 1.5em;
+    }
+
+    .menu-input-group label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--cyan);
+      margin-bottom: 0.5em;
+      letter-spacing: 0.2em;
+    }
+
+    .cyber-input {
+      background: rgba(0, 240, 255, 0.05);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      color: var(--cyan);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.1rem;
+      padding: 0.8em 1.2em;
+      width: 280px;
+      outline: none;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .cyber-input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.3), inset 0 0 15px rgba(0, 240, 255, 0.1);
+    }
+
+    .skin-selector {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 2em;
+    }
+
+    .skin-option {
+      width: 48px;
+      height: 48px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .skin-option::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 2px;
+    }
+
+    .skin-option:nth-child(1)::after { background: linear-gradient(135deg, #00f0ff, #0066ff); }
+    .skin-option:nth-child(2)::after { background: linear-gradient(135deg, #ff00ff, #ff0066); }
+    .skin-option:nth-child(3)::after { background: linear-gradient(135deg, #aa00ff, #6600ff); }
+    .skin-option:nth-child(4)::after { background: linear-gradient(135deg, #ffff00, #ff8800); }
+    .skin-option:nth-child(5)::after { background: linear-gradient(135deg, #00ff88, #00ffcc); }
+
+    .skin-option.selected {
+      border-color: var(--cyan);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+      transform: scale(1.1);
+    }
+
+    .skin-option:hover {
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .cyber-btn {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      padding: 1em 3em;
+      border: none;
+      cursor: pointer;
+      position: relative;
+      text-transform: uppercase;
+      transition: all 0.3s;
+      clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    }
+
+    .cyber-btn.primary {
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      color: #000;
+    }
+
+    .cyber-btn.primary:hover {
+      box-shadow: 0 0 30px rgba(0, 240, 255, 0.5);
+      transform: translateY(-2px);
+    }
+
+    .cyber-btn.secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--cyan);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+    }
+
+    .cyber-btn.secondary:hover {
+      background: rgba(0, 240, 255, 0.1);
+    }
+
+    .menu-footer {
+      margin-top: 3em;
+      font-size: 0.7rem;
+      opacity: 0.4;
+      letter-spacing: 0.2em;
+    }
+
+    .menu-controls {
+      margin-top: 1.5em;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.5);
+      line-height: 1.8;
+    }
+
+    .menu-controls kbd {
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-family: 'Share Tech Mono', monospace;
+      color: var(--cyan);
+    }
+
+    /* ═══ LOADING ═════════════════════════════════════════════ */
+    #loading {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 200;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--dark-bg);
+    }
+
+    .loading-spinner {
+      width: 60px;
+      height: 60px;
+      border: 3px solid rgba(0, 240, 255, 0.1);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1.5em;
+    }
+
+    .loading-text {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.9rem;
+      color: var(--cyan);
+      letter-spacing: 0.2em;
+      animation: pulse-text 1.5s ease-in-out infinite;
+    }
+
+    /* ═══ HUD ═════════════════════════════════════════════════ */
+    #hud {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      padding: 15px 20px;
+      gap: 15px;
+    }
+
+    .hud-top > div {
+      background: var(--panel-bg);
+      padding: 8px 16px;
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+    }
+
+    .hud-label {
+      font-size: 0.6rem;
+      color: var(--cyan);
+      opacity: 0.6;
+      letter-spacing: 0.15em;
+      display: block;
+    }
+
+    .hud-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .hud-unit {
+      font-size: 0.7rem;
+      color: var(--cyan);
+      opacity: 0.5;
+    }
+
+    .hud-overdrive {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+    }
+
+    .hud-overdrive-label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.65rem;
+      color: var(--cyan);
+      letter-spacing: 0.3em;
+      margin-bottom: 5px;
+    }
+
+    .hud-overdrive-bar {
+      width: 200px;
+      height: 6px;
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      overflow: hidden;
+    }
+
+    .hud-overdrive-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      transition: width 0.2s;
+    }
+
+    .hud-overdrive-fill.ready {
+      background: linear-gradient(90deg, var(--cyan), var(--magenta));
+      animation: pulse-bar 0.5s ease-in-out infinite alternate;
+    }
+
+    .hud-overdrive-fill.active {
+      background: linear-gradient(90deg, var(--magenta), var(--yellow));
+      animation: overdrive-bar 0.3s ease-in-out infinite alternate;
+    }
+
+    .hud-overdrive-hint {
+      font-size: 0.6rem;
+      color: rgba(255, 255, 255, 0.3);
+      margin-top: 4px;
+    }
+
+    .hud-overdrive-hint.ready {
+      color: var(--cyan);
+      animation: pulse-text 0.8s ease-in-out infinite;
+    }
+
+    .hud-leaderboard {
+      position: fixed;
+      top: 80px;
+      right: 15px;
+      background: var(--panel-bg);
+      border: 1px solid rgba(0, 240, 255, 0.1);
+      padding: 10px 14px;
+      min-width: 180px;
+    }
+
+    .hud-lb-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.6rem;
+      color: var(--cyan);
+      letter-spacing: 0.2em;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+      padding-bottom: 5px;
+    }
+
+    .hud-lb-row {
+      display: flex;
+      gap: 8px;
+      font-size: 0.7rem;
+      padding: 2px 0;
+      align-items: center;
+    }
+
+    .hud-lb-row.dead { opacity: 0.4; }
+
+    .hud-lb-rank {
+      color: var(--cyan);
+      font-weight: bold;
+      width: 16px;
+    }
+
+    .hud-lb-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hud-lb-dist {
+      color: var(--yellow);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.6rem;
+    }
+
+    .hud-contract {
+      position: fixed;
+      top: 80px;
+      left: 15px;
+      background: var(--panel-bg);
+      border: 1px solid rgba(170, 0, 255, 0.2);
+      padding: 10px 14px;
+      max-width: 220px;
+    }
+
+    .hud-contract-label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.6rem;
+      color: var(--purple);
+      letter-spacing: 0.2em;
+      margin-bottom: 5px;
+    }
+
+    .hud-contract-text {
+      font-size: 0.75rem;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .hud-contract-progress {
+      font-size: 0.7rem;
+      color: var(--purple);
+    }
+
+    .hud-collect-flash {
+      position: fixed;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--yellow);
+      opacity: 0;
+      transition: opacity 0.15s, transform 0.3s;
+      pointer-events: none;
+      text-shadow: 0 0 20px var(--yellow);
+    }
+
+    .hud-collect-flash.show {
+      opacity: 1;
+      transform: translate(-50%, -60%) scale(1.2);
+    }
+
+    .hud-drone-mode {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.9rem;
+      color: var(--cyan);
+      letter-spacing: 0.3em;
+      opacity: 0.6;
+      animation: pulse-text 2s ease-in-out infinite;
+    }
+
+    /* ═══ DEATH SCREEN ════════════════════════════════════════ */
+    #death-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 10, 46, 0);
+      transition: background 0.5s;
+      pointer-events: none;
+    }
+
+    #death-overlay.show {
+      background: rgba(10, 10, 46, 0.85);
+      pointer-events: auto;
+    }
+
+    .death-content {
+      text-align: center;
+      transform: scale(0.8);
+      opacity: 0;
+      transition: all 0.5s;
+    }
+
+    #death-overlay.show .death-content {
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    .death-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.8rem;
+      color: #ff0044;
+      letter-spacing: 0.4em;
+      margin-bottom: 0.5em;
+    }
+
+    .death-glitch {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(2rem, 6vw, 4rem);
+      font-weight: 900;
+      color: #ff0044;
+      position: relative;
+      animation: glitch 1s infinite;
+    }
+
+    .death-stats {
+      display: flex;
+      gap: 30px;
+      justify-content: center;
+      margin: 2em 0;
+    }
+
+    .death-stat {
+      text-align: center;
+    }
+
+    .death-stat-label {
+      font-size: 0.6rem;
+      color: var(--cyan);
+      letter-spacing: 0.2em;
+      display: block;
+      margin-bottom: 0.3em;
+    }
+
+    .death-stat-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .death-buttons {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      margin-top: 1em;
+    }
+
+    /* ═══ ANIMATIONS ══════════════════════════════════════════ */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse-text {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+
+    @keyframes pulse-bar {
+      from { box-shadow: 0 0 5px var(--cyan); }
+      to { box-shadow: 0 0 15px var(--cyan); }
+    }
+
+    @keyframes overdrive-bar {
+      from { box-shadow: 0 0 5px var(--magenta); }
+      to { box-shadow: 0 0 20px var(--yellow); }
+    }
+
+    @keyframes glitch {
+      0% { text-shadow: 2px 0 var(--cyan), -2px 0 var(--magenta); }
+      20% { text-shadow: -2px 2px var(--cyan), 2px -2px var(--magenta); }
+      40% { text-shadow: 2px -2px var(--cyan), -2px 2px var(--magenta); }
+      60% { text-shadow: 0 2px var(--cyan), 0 -2px var(--magenta); }
+      80% { text-shadow: -2px 0 var(--cyan), 2px 0 var(--magenta); }
+      100% { text-shadow: 2px 0 var(--cyan), -2px 0 var(--magenta); }
+    }
+
+    @keyframes glitch-title {
+      0%, 94%, 100% { opacity: 1; transform: none; }
+      95% { opacity: 0.8; transform: translateX(-3px) skewX(-2deg); }
+      96% { opacity: 1; transform: translateX(3px) skewX(2deg); }
+      97% { opacity: 0.9; transform: translateX(-1px); }
+    }
+
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100vh); }
+    }
+
+    /* Scanline overlay */
+    #hud::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 4px;
+      background: rgba(0, 240, 255, 0.03);
+      animation: scanline 4s linear infinite;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    /* ═══ RESPONSIVE ══════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      .hud-top {
+        flex-wrap: wrap;
+        padding: 8px 10px;
+        gap: 6px;
+      }
+      .hud-top > div {
+        padding: 4px 10px;
+      }
+      .hud-value {
+        font-size: 0.9rem;
+      }
+      .hud-leaderboard {
+        display: none;
+      }
+      .death-stats {
+        flex-direction: column;
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Game Canvas -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Main Menu -->
+  <div id="main-menu">
+    <canvas id="menu-bg-canvas"></canvas>
+    <div class="menu-content">
+      <h1 class="menu-title">NEON RUN</h1>
+      <p class="menu-subtitle">Cyberpunk Endless Runner</p>
+
+      <div class="menu-input-group">
+        <label>НИКНЕЙМ БЕГУНА</label>
+        <input type="text" class="cyber-input" id="nickname-input" placeholder="Runner" maxlength="16" autocomplete="off" />
+      </div>
+
+      <div class="menu-input-group">
+        <label>ЦВЕТ НЕОНА</label>
+        <div class="skin-selector">
+          <div class="skin-option selected" data-skin="0" title="Циан"></div>
+          <div class="skin-option" data-skin="1" title="Маджента"></div>
+          <div class="skin-option" data-skin="2" title="Фиолетовый"></div>
+          <div class="skin-option" data-skin="3" title="Жёлтый"></div>
+          <div class="skin-option" data-skin="4" title="Зелёный"></div>
+        </div>
+      </div>
+
+      <button class="cyber-btn primary" id="btn-join">ВОЙТИ В ГОРОД</button>
+
+      <div class="menu-controls">
+        <kbd>&larr;</kbd> <kbd>&rarr;</kbd> смена полосы &nbsp;&nbsp;
+        <kbd>&uarr;</kbd> / <kbd>SPACE</kbd> прыжок &nbsp;&nbsp;
+        <kbd>&darr;</kbd> скольжение &nbsp;&nbsp;
+        <kbd>SHIFT</kbd> овердрайв
+      </div>
+
+      <div class="menu-footer">
+        NEON RUN v1.0 &mdash; MULTIPLAYER CYBERPUNK RUNNER
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Screen -->
+  <div id="loading">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ...</div>
+  </div>
+
+  <!-- HUD (injected by JS) -->
+  <div id="hud" style="display:none;"></div>
+
+  <script type="module" src="/client/main.js"></script>
+</body>
+</html>
