@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Endless Runner</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
+body{display:flex;justify-content:center;align-items:center;font-family:'Segoe UI',sans-serif}
+canvas{display:block;image-rendering:pixelated}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// ═══════════════════════════════════════════════════
+// ENDLESS RUNNER — Mobile-first, single HTML file
+// ═══════════════════════════════════════════════════
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// ─── Responsive canvas (full-width, maintain aspect ratio) ───
+const GAME_W = 800, GAME_H = 400;
+let scale = 1, offsetX = 0, offsetY = 0;
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  scale = Math.min(w / GAME_W, h / GAME_H);
+  canvas.width = GAME_W * scale;
+  canvas.height = GAME_H * scale;
+  offsetX = (w - canvas.width) / 2;
+  offsetY = (h - canvas.height) / 2;
+  canvas.style.marginLeft = offsetX + 'px';
+  canvas.style.marginTop = offsetY + 'px';
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ─── Web Audio (simple beeps) ───
+let audioCtx;
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function playSound(freq, dur, type = 'square', vol = 0.15) {
+  try {
+    initAudio();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.value = vol;
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + dur);
+  } catch (e) {}
+}
+function sfxJump() { playSound(500, 0.12, 'sine', 0.12); }
+function sfxCoin() { playSound(800, 0.1, 'sine', 0.18); playSound(1200, 0.15, 'sine', 0.12); }
+function sfxDie() { playSound(150, 0.3, 'sawtooth', 0.15); }
+function vibrate(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch(e) {} }
+
+// ─── Locales (biomes) with unique obstacles ───
+const LOCALES = [
+  { name: 'Forest', sky1: '#87CEEB', sky2: '#228B22', ground: '#3a5f0b', groundLine: '#5a8f2b',
+    mountain: '#2d5016', mountainMid: '#3a6b1e', mountainFar: '#4a8a2a',
+    obstacleColor: '#5c3a1e', obstacleTop: '#3a2510', obstacleNames: ['stump', 'log', 'bush'],
+    playerTint: '#00d2ff', cloudColor: 'rgba(255,255,255,0.5)' },
+  { name: 'Desert', sky1: '#f4a460', sky2: '#deb887', ground: '#c2a060', groundLine: '#e0c080',
+    mountain: '#b8934a', mountainMid: '#c9a55a', mountainFar: '#a08040',
+    obstacleColor: '#2d6b30', obstacleTop: '#1a4a1e', obstacleNames: ['cactus', 'rock', 'skull'],
+    playerTint: '#ff8c00', cloudColor: 'rgba(255,220,180,0.3)' },
+  { name: 'Snow', sky1: '#b0c4de', sky2: '#e8e8f0', ground: '#dcdcdc', groundLine: '#f0f0ff',
+    mountain: '#a0b0c0', mountainMid: '#b8c8d8', mountainFar: '#90a0b0',
+    obstacleColor: '#6080a0', obstacleTop: '#405870', obstacleNames: ['snowdrift', 'ice', 'snowman'],
+    playerTint: '#88ddff', cloudColor: 'rgba(200,220,255,0.5)' },
+  { name: 'Night City', sky1: '#0a0a2e', sky2: '#1a1a4e', ground: '#1a1a2e', groundLine: '#ff00ff',
+    mountain: '#15153e', mountainMid: '#202058', mountainFar: '#0d0d28',
+    obstacleColor: '#ff2e63', obstacleTop: '#ff6b8a', obstacleNames: ['barrel', 'cone', 'box'],
+    playerTint: '#ff00ff', cloudColor: 'rgba(255,0,255,0.06)' },
+  { name: 'Lava', sky1: '#1a0000', sky2: '#4a0a00', ground: '#3a1a0a', groundLine: '#ff4400',
+    mountain: '#4a1a0a', mountainMid: '#5a2510', mountainFar: '#300a00',
+    obstacleColor: '#ff6600', obstacleTop: '#ffaa00', obstacleNames: ['fireball', 'rock', 'pillar'],
+    playerTint: '#ff4400', cloudColor: 'rgba(255,68,0,0.08)' },
+];
+
+// ─── Constants ───
+const GROUND_Y = 330;
+const PLAYER_X = 100;
+const GRAVITY = 0.65;
+const JUMP_FORCE = -13;
+const BASE_SPEED = 4.5;
+const LOCALE_CHANGE_SCORE = 500;
+
+// ─── Game State ───
+let state = 'menu'; // menu, playing, paused, gameover, leaderboard
+let score = 0, highScore = 0, frameCount = 0, gameSpeed = BASE_SPEED;
+let currentLocaleIdx = 0, prevLocaleIdx = -1, localeTransition = 0;
+let obstacles = [], coins = [], particles = [], dustParticles = [];
+let lastObstacleFrame = 0, lastCoinFrame = 0;
+let difficultyMul = 1;
+let playerName = '';
+let ghostData = null, ghostIdx = 0;
+let jumpRecord = []; // record jumps for ghost: [{frame, y}]
+
+// ─── Player ───
+const player = {
+  x: PLAYER_X, y: GROUND_Y - 40, w: 36, h: 40,
+  vy: 0, grounded: true, rotation: 0,
+  eyeBlink: 0, legAnim: 0
+};
+
+// ─── Parallax layers ───
+let bgLayers = [];
+let clouds = [];
+
+function seedRandom(s) { return function() { s=(s*1664525+1013904223)&0xFFFFFFFF; return(s>>>0)/0xFFFFFFFF; }; }
+let rng = seedRandom(Date.now());
+
+function generateBgLayers() {
+  bgLayers = [];
+  const r = seedRandom(42);
+  const far = []; for (let x = 0; x < 1000; x += 60 + r() * 50) far.push({ x, h: 40 + r() * 40, w: 80 + r() * 60 });
+  bgLayers.push({ shapes: far, speed: 0.2, yOff: 0 });
+  const mid = []; for (let x = 0; x < 1000; x += 40 + r() * 40) mid.push({ x, h: 30 + r() * 30, w: 50 + r() * 40 });
+  bgLayers.push({ shapes: mid, speed: 0.5, yOff: 15 });
+  const near = []; for (let x = 0; x < 1000; x += 30 + r() * 30) near.push({ x, h: 15 + r() * 20, w: 25 + r() * 20 });
+  bgLayers.push({ shapes: near, speed: 0.9, yOff: 30 });
+  clouds = [];
+  for (let i = 0; i < 5; i++) clouds.push({ x: r() * 900, y: 20 + r() * 80, w: 50 + r() * 80, h: 12 + r() * 15, speed: 0.1 + r() * 0.2 });
+}
+
+// ─── Locale helpers ───
+function currentLocale() { return LOCALES[currentLocaleIdx]; }
+
+function lerpHex(a, b, t) {
+  const ah = parseInt(a.slice(1), 16), bh = parseInt(b.slice(1), 16);
+  const r = Math.round(((ah >> 16) & 0xff) + (((bh >> 16) & 0xff) - ((ah >> 16) & 0xff)) * t);
+  const g = Math.round(((ah >> 8) & 0xff) + (((bh >> 8) & 0xff) - ((ah >> 8) & 0xff)) * t);
+  const bl = Math.round((ah & 0xff) + ((bh & 0xff) - (ah & 0xff)) * t);
+  return `#${((r << 16) | (g << 8) | bl).toString(16).padStart(6, '0')}`;
+}
+
+function getLocaleColor(key) {
+  const cur = currentLocale();
+  if (localeTransition > 0 && prevLocaleIdx >= 0) {
+    const prev = LOCALES[prevLocaleIdx];
+    const t = 1 - localeTransition / 90;
+    if (prev[key] && cur[key] && prev[key].startsWith('#') && cur[key].startsWith('#'))
+      return lerpHex(prev[key], cur[key], t);
+  }
+  return cur[key];
+}
+
+// ─── Leaderboard (localStorage) ───
+function getLeaderboard() {
+  try { return JSON.parse(localStorage.getItem('runner_lb') || '[]'); } catch { return []; }
+}
+function saveLeaderboard(lb) { try { localStorage.setItem('runner_lb', JSON.stringify(lb)); } catch {} }
+function addScore(name, sc) {
+  const lb = getLeaderboard();
+  lb.push({ name: name || 'Anonymous', score: sc, date: new Date().toLocaleDateString() });
+  lb.sort((a, b) => b.score - a.score);
+  if (lb.length > 10) lb.length = 10;
+  saveLeaderboard(lb);
+}
+function clearLeaderboard() { try { localStorage.removeItem('runner_lb'); } catch {} }
+
+// ─── Ghost (best run replay from localStorage) ───
+function saveBestRun(sc, jumps) {
+  try {
+    const prev = JSON.parse(localStorage.getItem('runner_best') || '{}');
+    if (!prev.score || sc > prev.score) {
+      localStorage.setItem('runner_best', JSON.stringify({ score: sc, jumps }));
+    }
+  } catch {}
+}
+function loadGhost() {
+  try {
+    const d = JSON.parse(localStorage.getItem('runner_best') || 'null');
+    if (d && d.jumps && d.jumps.length > 0) return d;
+  } catch {}
+  // Demo ghost if no saved run
+  const jumps = [];
+  for (let f = 60; f < 3000; f += 80 + Math.floor(Math.random() * 60)) jumps.push(f);
+  return { score: 150, jumps };
+}
+
+// ─── Init / Reset ───
+function initGame() {
+  score = 0; frameCount = 0; gameSpeed = BASE_SPEED;
+  currentLocaleIdx = Math.floor(Math.random() * LOCALES.length);
+  prevLocaleIdx = -1; localeTransition = 0; difficultyMul = 1;
+  obstacles = []; coins = []; particles = []; dustParticles = [];
+  lastObstacleFrame = -120; lastCoinFrame = -80;
+  player.y = GROUND_Y - player.h; player.vy = 0;
+  player.grounded = true; player.rotation = 0;
+  jumpRecord = [];
+  ghostData = loadGhost(); ghostIdx = 0;
+  generateBgLayers();
+  rng = seedRandom(Date.now());
+}
+
+// ─── Ghost player state ───
+const ghost = { x: PLAYER_X - 30, y: GROUND_Y - 40, vy: 0, grounded: true, opacity: 0.35 };
+
+function updateGhost() {
+  if (!ghostData || !navigator.onLine) return;
+  // Check if ghost should jump at this frame
+  while (ghostIdx < ghostData.jumps.length && ghostData.jumps[ghostIdx] <= frameCount) {
+    if (ghost.grounded) { ghost.vy = JUMP_FORCE; ghost.grounded = false; }
+    ghostIdx++;
+  }
+  ghost.vy += GRAVITY;
+  ghost.y += ghost.vy;
+  if (ghost.y >= GROUND_Y - 40) { ghost.y = GROUND_Y - 40; ghost.vy = 0; ghost.grounded = true; }
+}
+
+// ─── Input ───
+function doJump() {
+  if (state === 'menu') { initGame(); state = 'playing'; initAudio(); return; }
+  if (state === 'gameover') return;
+  if (state === 'paused') { state = 'playing'; return; }
+  if (state === 'leaderboard') { state = 'menu'; return; }
+  if (player.grounded) {
+    player.vy = JUMP_FORCE;
+    player.grounded = false;
+    jumpRecord.push(frameCount);
+    sfxJump();
+    // Dust particles
+    for (let i = 0; i < 6; i++) {
+      dustParticles.push({
+        x: player.x + player.w / 2, y: GROUND_Y,
+        vx: (Math.random() - 0.5) * 3, vy: -Math.random() * 2,
+        r: 2 + Math.random() * 2, life: 15 + Math.random() * 10, maxLife: 25,
+        color: getLocaleColor('groundLine')
+      });
+    }
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); doJump(); }
+  if (e.code === 'KeyP' && state === 'playing') { state = 'paused'; }
+  if (e.code === 'Escape') {
+    if (state === 'paused') state = 'playing';
+    else if (state === 'leaderboard') state = 'menu';
+  }
+});
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const cx = (e.clientX - rect.left) / scale;
+  const cy = (e.clientY - rect.top) / scale;
+  // Pause button area (top-right)
+  if (state === 'playing' && cx > GAME_W - 60 && cy < 50) { state = 'paused'; return; }
+  // Game Over buttons
+  if (state === 'gameover') {
+    if (cx > 280 && cx < 520 && cy > 240 && cy < 280) { initGame(); state = 'playing'; return; }
+    if (cx > 280 && cx < 520 && cy > 290 && cy < 330) { state = 'leaderboard'; return; }
+    return;
+  }
+  // Leaderboard
+  if (state === 'leaderboard') {
+    if (cx > 280 && cx < 520 && cy > 340 && cy < 375) { clearLeaderboard(); return; }
+    if (cx > 280 && cx < 520 && cy > 375 && cy < 400) { state = 'menu'; return; }
+    return;
+  }
+  doJump();
+});
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const cx = (touch.clientX - rect.left) / scale;
+  const cy = (touch.clientY - rect.top) / scale;
+  if (state === 'playing' && cx > GAME_W - 60 && cy < 50) { state = 'paused'; return; }
+  if (state === 'gameover') {
+    if (cx > 280 && cx < 520 && cy > 240 && cy < 280) { initGame(); state = 'playing'; return; }
+    if (cx > 280 && cx < 520 && cy > 290 && cy < 330) { state = 'leaderboard'; return; }
+    return;
+  }
+  if (state === 'leaderboard') {
+    if (cx > 280 && cx < 520 && cy > 340 && cy < 375) { clearLeaderboard(); return; }
+    if (cx > 280 && cx < 520 && cy > 375 && cy < 400) { state = 'menu'; return; }
+    return;
+  }
+  doJump();
+}, { passive: false });
+
+// ─── Spawn ───
+function spawnObstacle() {
+  // Gradual difficulty: first 5 obstacles are rare
+  const minGap = score < 100 ? 120 : Math.max(50, 90 - difficultyMul * 5);
+  if (frameCount - lastObstacleFrame < minGap) return;
+  if (rng() > 0.03 * difficultyMul) return;
+  const loc = currentLocale();
+  const h = 25 + rng() * 35;
+  const w = 20 + rng() * 20;
+  const type = loc.obstacleNames[Math.floor(rng() * loc.obstacleNames.length)];
+  obstacles.push({ x: GAME_W + 10, y: GROUND_Y - h, w, h, type, scored: false });
+  lastObstacleFrame = frameCount;
+}
+
+function spawnCoin() {
+  if (frameCount - lastCoinFrame < 80) return;
+  if (rng() > 0.015) return;
+  coins.push({ x: GAME_W + 10, y: GROUND_Y - 60 - rng() * 70, r: 10, collected: false });
+  lastCoinFrame = frameCount;
+}
+
+// ─── Particles ───
+function emitParticles(x, y, n, color) {
+  for (let i = 0; i < n; i++) {
+    particles.push({
+      x, y, vx: (Math.random() - 0.5) * 7, vy: (Math.random() - 1) * 6,
+      r: 1.5 + Math.random() * 3, life: 20 + Math.random() * 20, maxLife: 40,
+      color: color || currentLocale().obstacleColor
+    });
+  }
+}
+
+// ─── Collision ───
+function collides(a, b) {
+  // Slight forgiveness (shrink hitbox)
+  const shrink = 4;
+  return a.x + shrink < b.x + b.w && a.x + a.w - shrink > b.x &&
+         a.y + shrink < b.y + b.h && a.y + a.h - shrink > b.y;
+}
+
+// ─── Update ───
+function update() {
+  if (state !== 'playing') return;
+  frameCount++;
+  score = Math.floor(frameCount / 6);
+
+  // Locale change every LOCALE_CHANGE_SCORE points
+  const targetLocale = Math.floor(score / LOCALE_CHANGE_SCORE);
+  if (targetLocale > 0 && targetLocale !== Math.floor((score - 1) / LOCALE_CHANGE_SCORE)) {
+    prevLocaleIdx = currentLocaleIdx;
+    let newIdx;
+    do { newIdx = Math.floor(Math.random() * LOCALES.length); } while (newIdx === currentLocaleIdx);
+    currentLocaleIdx = newIdx;
+    localeTransition = 90;
+  }
+  if (localeTransition > 0) localeTransition--;
+
+  // Difficulty scales with locales passed
+  difficultyMul = 1 + targetLocale * 0.15;
+  gameSpeed = BASE_SPEED * difficultyMul;
+
+  // Player physics
+  player.vy += GRAVITY;
+  player.y += player.vy;
+  if (player.y >= GROUND_Y - player.h) {
+    player.y = GROUND_Y - player.h;
+    player.vy = 0;
+    player.grounded = true;
+  }
+  if (!player.grounded) player.rotation += 0.1; else player.rotation = 0;
+  player.legAnim += 0.3;
+  player.eyeBlink = (frameCount % 180 < 5) ? 1 : 0;
+
+  // Running dust
+  if (player.grounded && frameCount % 8 === 0) {
+    dustParticles.push({
+      x: player.x + 5, y: GROUND_Y,
+      vx: -1 - Math.random(), vy: -Math.random() * 1.5,
+      r: 1.5 + Math.random() * 1.5, life: 10 + Math.random() * 8, maxLife: 18,
+      color: getLocaleColor('ground')
+    });
+  }
+
+  // Ghost
+  updateGhost();
+
+  // Obstacles
+  spawnObstacle();
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    obstacles[i].x -= gameSpeed;
+    if (!obstacles[i].scored && obstacles[i].x + obstacles[i].w < player.x) {
+      obstacles[i].scored = true;
+    }
+    if (obstacles[i].x + obstacles[i].w < -20) { obstacles.splice(i, 1); continue; }
+    if (collides(player, obstacles[i])) {
+      state = 'gameover';
+      sfxDie(); vibrate(100);
+      emitParticles(player.x + player.w / 2, player.y + player.h / 2, 25, currentLocale().playerTint);
+      saveBestRun(score, jumpRecord);
+      addScore(playerName || 'Player', score);
+      highScore = Math.max(highScore, score);
+      return;
+    }
+  }
+
+  // Coins
+  spawnCoin();
+  for (let i = coins.length - 1; i >= 0; i--) {
+    coins[i].x -= gameSpeed;
+    if (coins[i].x < -20) { coins.splice(i, 1); continue; }
+    if (!coins[i].collected) {
+      const cx = player.x + player.w / 2, cy = player.y + player.h / 2;
+      const dx = cx - coins[i].x, dy = cy - coins[i].y;
+      if (Math.sqrt(dx * dx + dy * dy) < player.w / 2 + coins[i].r) {
+        coins[i].collected = true;
+        score += 10; sfxCoin();
+        emitParticles(coins[i].x, coins[i].y, 8, '#ffd700');
+        coins.splice(i, 1);
+      }
+    }
+  }
+
+  // Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = dustParticles.length - 1; i >= 0; i--) {
+    const p = dustParticles[i]; p.x += p.vx; p.y += p.vy; p.life--;
+    if (p.life <= 0) dustParticles.splice(i, 1);
+  }
+
+  // Parallax
+  for (const l of bgLayers) for (const s of l.shapes) { s.x -= gameSpeed * l.speed; if (s.x + s.w < -10) s.x += 1000 + s.w; }
+  for (const c of clouds) { c.x -= gameSpeed * c.speed; if (c.x + c.w < -10) { c.x = GAME_W + 10 + Math.random() * 100; c.y = 20 + Math.random() * 80; } }
+}
+
+// ═══════════════════════════════════════
+// ─── DRAWING ───
+// ═══════════════════════════════════════
+
+function drawBg() {
+  const g = ctx.createLinearGradient(0, 0, 0, GAME_H);
+  g.addColorStop(0, getLocaleColor('sky1'));
+  g.addColorStop(1, getLocaleColor('sky2'));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, GAME_W, GAME_H);
+
+  // Clouds
+  ctx.fillStyle = currentLocale().cloudColor || 'rgba(255,255,255,0.3)';
+  for (const c of clouds) {
+    ctx.beginPath(); ctx.ellipse(c.x + c.w / 2, c.y + c.h / 2, c.w / 2, c.h / 2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(c.x + c.w * 0.3, c.y + c.h * 0.35, c.w * 0.3, c.h * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function drawMountains() {
+  const keys = ['mountainFar', 'mountainMid', 'mountain'];
+  for (let i = 0; i < bgLayers.length; i++) {
+    ctx.fillStyle = getLocaleColor(keys[i] || 'mountain');
+    for (const s of bgLayers[i].shapes) {
+      ctx.beginPath();
+      ctx.moveTo(s.x, GROUND_Y - bgLayers[i].yOff);
+      ctx.lineTo(s.x + s.w / 2, GROUND_Y - bgLayers[i].yOff - s.h);
+      ctx.lineTo(s.x + s.w, GROUND_Y - bgLayers[i].yOff);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+}
+
+function drawGround() {
+  ctx.fillStyle = getLocaleColor('ground');
+  ctx.fillRect(0, GROUND_Y, GAME_W, GAME_H - GROUND_Y);
+  ctx.strokeStyle = getLocaleColor('groundLine'); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, GROUND_Y); ctx.lineTo(GAME_W, GROUND_Y); ctx.stroke();
+  // Moving dashes
+  ctx.globalAlpha = 0.4;
+  const d = state === 'playing' ? (frameCount * gameSpeed * 1.2) % 25 : 0;
+  for (let x = -d; x < GAME_W; x += 25) {
+    ctx.beginPath(); ctx.moveTo(x, GROUND_Y + 12); ctx.lineTo(x + 10, GROUND_Y + 12); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ─── Draw character (player or ghost) ───
+function drawCharacter(x, y, w, h, color, rot, legAnim, blink, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha || 1;
+  const cx = x + w / 2, cy = y + h / 2;
+  ctx.translate(cx, cy);
+  ctx.rotate(rot || 0);
+
+  // Legs (simple animation)
+  const legOff = Math.sin(legAnim || 0) * 4;
+  ctx.fillStyle = color;
+  ctx.fillRect(-8, h / 2 - 2, 6, 8 + legOff);
+  ctx.fillRect(3, h / 2 - 2, 6, 8 - legOff);
+
+  // Body (rounded rect)
+  ctx.fillStyle = color;
+  const r = 5, hw = w / 2, hh = h / 2 - 3;
+  ctx.beginPath();
+  ctx.moveTo(-hw + r, -hh); ctx.lineTo(hw - r, -hh);
+  ctx.quadraticCurveTo(hw, -hh, hw, -hh + r);
+  ctx.lineTo(hw, hh - r); ctx.quadraticCurveTo(hw, hh, hw - r, hh);
+  ctx.lineTo(-hw + r, hh); ctx.quadraticCurveTo(-hw, hh, -hw, hh - r);
+  ctx.lineTo(-hw, -hh + r); ctx.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
+  ctx.closePath(); ctx.fill();
+
+  // Eye
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(5, -6, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(7, -6, blink ? 0.5 : 3, 0, Math.PI * 2); ctx.fill();
+
+  // Mouth
+  ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(4, 2, 3, 0.1, Math.PI - 0.1); ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawObstacles() {
+  const loc = currentLocale();
+  for (const o of obstacles) {
+    ctx.fillStyle = getLocaleColor('obstacleColor');
+    // Different shapes based on type
+    if (o.type === 'cactus') {
+      ctx.fillRect(o.x + o.w / 2 - 4, o.y, 8, o.h);
+      ctx.fillRect(o.x, o.y + 8, o.w, 6);
+    } else if (o.type === 'snowman' || o.type === 'snowdrift') {
+      ctx.beginPath(); ctx.arc(o.x + o.w / 2, o.y + o.h - 10, o.w / 2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(o.x + o.w / 2, o.y + 8, o.w / 3, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // Default box/stump
+      ctx.fillRect(o.x, o.y, o.w, o.h);
+      ctx.fillStyle = getLocaleColor('obstacleTop');
+      ctx.fillRect(o.x - 2, o.y, o.w + 4, 4);
+    }
+  }
+}
+
+function drawCoins() {
+  const bob = Math.sin(frameCount * 0.08) * 3;
+  for (const c of coins) {
+    if (c.collected) continue;
+    ctx.save(); ctx.translate(c.x, c.y + bob);
+    ctx.fillStyle = '#ffd700'; ctx.shadowColor = 'rgba(255,215,0,0.4)'; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#b8960a'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, 0, c.r - 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#b8960a'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('$', 0, 1);
+    ctx.restore();
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+  }
+  for (const p of dustParticles) {
+    ctx.globalAlpha = p.life / p.maxLife * 0.5;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHUD() {
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 20px "Segoe UI",sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(`Score: ${score}`, 16, 30);
+  ctx.font = '13px sans-serif'; ctx.fillStyle = '#ccc';
+  ctx.fillText(`Best: ${highScore}`, 16, 48);
+  ctx.fillStyle = currentLocale().playerTint;
+  ctx.fillText(currentLocale().name, 16, 64);
+
+  // Pause button
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillRect(GAME_W - 52, 8, 44, 36);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('| |', GAME_W - 30, 32);
+
+  // Online indicator
+  if (navigator.onLine && ghostData) {
+    ctx.fillStyle = '#39ff14'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText('GHOST: Best Run', GAME_W - 16, GAME_H - 8);
+  } else {
+    ctx.fillStyle = '#ff4444'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText('OFFLINE', GAME_W - 16, GAME_H - 8);
+  }
+}
+
+function drawMenu() {
+  drawBg(); drawMountains(); drawGround();
+  // Overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, GAME_W, GAME_H);
+  ctx.fillStyle = '#00d2ff'; ctx.font = 'bold 48px "Segoe UI",sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('ENDLESS RUNNER', GAME_W / 2, 140);
+  ctx.fillStyle = '#fff'; ctx.font = '20px sans-serif';
+  ctx.fillText('Tap or press SPACE to start', GAME_W / 2, 200);
+  ctx.fillStyle = '#888'; ctx.font = '14px sans-serif';
+  ctx.fillText('Jump over obstacles. Collect coins. Survive!', GAME_W / 2, 240);
+  if (highScore > 0) {
+    ctx.fillStyle = '#ffd700'; ctx.font = '18px sans-serif';
+    ctx.fillText(`High Score: ${highScore}`, GAME_W / 2, 280);
+  }
+  ctx.fillStyle = '#555'; ctx.font = '12px sans-serif';
+  ctx.fillText('Biomes change every 500 pts | Ghost replays your best run', GAME_W / 2, 340);
+  ctx.fillText('P = Pause | Tap pause button on mobile', GAME_W / 2, 360);
+}
+
+function drawBtn(x, y, w, h, text, bgColor, textColor) {
+  ctx.fillStyle = bgColor;
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 8); ctx.fill();
+  ctx.fillStyle = textColor; ctx.font = 'bold 18px "Segoe UI",sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(text, x + w / 2, y + h / 2 + 6);
+}
+
+function drawGameOver() {
+  // Fade overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, GAME_W, GAME_H);
+  ctx.fillStyle = '#ff2e63'; ctx.font = 'bold 44px "Segoe UI",sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('GAME OVER', GAME_W / 2, 140);
+  ctx.fillStyle = '#fff'; ctx.font = '24px sans-serif';
+  ctx.fillText(`Score: ${score}`, GAME_W / 2, 185);
+  ctx.fillStyle = '#ffd700'; ctx.font = '18px sans-serif';
+  ctx.fillText(`Best: ${highScore}`, GAME_W / 2, 215);
+  drawBtn(280, 240, 240, 40, 'RESTART', '#00d2ff', '#0a0a1a');
+  drawBtn(280, 290, 240, 40, 'LEADERBOARD', '#7b2ff7', '#fff');
+}
+
+function drawPaused() {
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 0, GAME_W, GAME_H);
+  ctx.fillStyle = '#ffd700'; ctx.font = 'bold 40px "Segoe UI",sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('PAUSED', GAME_W / 2, 190);
+  ctx.fillStyle = '#fff'; ctx.font = '18px sans-serif';
+  ctx.fillText('Tap or press P to resume', GAME_W / 2, 240);
+}
+
+function drawLeaderboard() {
+  ctx.fillStyle = '#0a0a1a'; ctx.fillRect(0, 0, GAME_W, GAME_H);
+  ctx.fillStyle = '#00d2ff'; ctx.font = 'bold 30px "Segoe UI",sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('LEADERBOARD — TOP 10', GAME_W / 2, 40);
+  const lb = getLeaderboard();
+  ctx.font = '16px monospace'; ctx.textAlign = 'left';
+  for (let i = 0; i < 10; i++) {
+    const y = 70 + i * 26;
+    if (i < lb.length) {
+      const e = lb[i];
+      ctx.fillStyle = i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#aaa';
+      ctx.fillText(`${(i + 1 + '.').padEnd(4)} ${e.name.padEnd(16).slice(0, 16)} ${String(e.score).padStart(6)}   ${e.date}`, 120, y);
+    } else {
+      ctx.fillStyle = '#333';
+      ctx.fillText(`${(i + 1 + '.').padEnd(4)} ---`, 120, y);
+    }
+  }
+  drawBtn(280, 340, 240, 32, 'CLEAR', '#ff2e63', '#fff');
+  drawBtn(280, 378, 240, 32, 'BACK', '#00d2ff', '#0a0a1a');
+}
+
+// ─── Main Loop ───
+let lastTime = 0;
+function loop(ts) {
+  // Visibility check (energy saving)
+  if (document.hidden) { requestAnimationFrame(loop); return; }
+
+  update();
+
+  if (state === 'menu') { drawMenu(); }
+  else if (state === 'leaderboard') { drawLeaderboard(); }
+  else {
+    drawBg();
+    drawMountains();
+    drawGround();
+    drawObstacles();
+    drawCoins();
+    // Ghost
+    if (ghostData && navigator.onLine && state === 'playing') {
+      drawCharacter(ghost.x, ghost.y, 34, 38, '#aaa', 0, frameCount * 0.3, 0, ghost.opacity);
+    }
+    // Player
+    drawCharacter(player.x, player.y, player.w, player.h,
+      getLocaleColor('playerTint') || '#00d2ff',
+      player.rotation, player.legAnim, player.eyeBlink, 1);
+    drawParticles();
+    if (state === 'playing') drawHUD();
+    if (state === 'paused') drawPaused();
+    if (state === 'gameover') { drawHUD(); drawGameOver(); }
+  }
+
+  requestAnimationFrame(loop);
+}
+
+// ─── Load high score ───
+const lb = getLeaderboard();
+if (lb.length > 0) highScore = lb[0].score;
+generateBgLayers();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
